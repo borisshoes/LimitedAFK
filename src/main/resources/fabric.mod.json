@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "id": "limitedafk",
+  "version": "${version}",
+  "name": "LimitedAFK",
+  "description": "Limit how much time players can AFK on your server.",
+  "authors": [],
+  "contact": {},
+  "license": "All-Rights-Reserved",
+  "icon": "assets/LimitedAFK/icon.png",
+  "environment": "server",
+  "entrypoints": {
+    "main": [
+      "net.borisshoes.limitedafk.LimitedAFK"
+    ],
+    "cardinal-components-entity": [
+      "net.borisshoes.limitedafk.cca.PlayerComponentInitializer"
+    ]
+  },
+  "custom": {
+    "cardinal-components": ["limitedafk:profile"]
+  },
+  "mixins": [
+    "LimitedAFK.mixins.json"
+  ],
+  "accessWidener" : "limitedafk.accesswidener",
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "fabric": "*",
+    "minecraft": ">=${minecraft_version}"
+  }
+}
