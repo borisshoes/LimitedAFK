@@ -21,18 +21,19 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.PlayerManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.text.ClickEvent;
+import net.minecraft.text.HoverEvent;
 import net.minecraft.text.MutableText;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
+import net.minecraft.util.Pair;
 import net.minecraft.util.UserCache;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.jetbrains.annotations.NotNull;
 
 import java.text.DecimalFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static net.borisshoes.limitedafk.cca.PlayerComponentInitializer.PLAYER_DATA;
 
@@ -137,7 +138,7 @@ public class LimitedAFK implements ModInitializer {
       source.sendFeedback(() -> Text.literal("")
             .append(player.getDisplayName())
             .append(Text.literal(" has an AFK percentage of ").formatted(Formatting.DARK_AQUA))
-            .append(Text.literal(df.format(100L*profile.getAfkTime()/profile.getTotalTime())).formatted(Formatting.AQUA))
+            .append(Text.literal(df.format(100L*profile.getAfkTime()/(profile.getTotalTime()+1))).formatted(Formatting.AQUA))
             .append(Text.literal("%").formatted(Formatting.AQUA)),false);
       
       return 1;
@@ -164,22 +165,29 @@ public class LimitedAFK implements ModInitializer {
       DecimalFormat df = new DecimalFormat("#.00");
       
       log(0,"An Operator has initiated a playtime dump:");
-      source.sendFeedback(() -> Text.literal("===== Full Playtime List ====="),false);
+      StringBuilder masterString = new StringBuilder("===== Full Playtime List =====");
+      
+      ArrayList<IPlayerProfileComponent> allPlaytime = new ArrayList<>();
       
       for(ServerPlayerEntity player : allPlayers){
          server.getPlayerManager().loadPlayerData(player);
          IPlayerProfileComponent profile = PLAYER_DATA.get(player);
-         MutableText response = Text.literal("")
-               .append(player.getDisplayName())
-               .append(Text.literal(" has played for [").formatted(Formatting.WHITE))
-               .append(Text.literal(timeToStr(profile.getTotalTime())).formatted(Formatting.AQUA))
-               .append(Text.literal("] with an AFK percentage of ").formatted(Formatting.WHITE))
-               .append(Text.literal(df.format(100L*profile.getAfkTime()/profile.getTotalTime())).formatted(Formatting.DARK_AQUA))
-               .append(Text.literal("%").formatted(Formatting.DARK_AQUA));
-         
-         source.sendFeedback(() -> response,false);
-         log(0,response.getString());
+         allPlaytime.add(profile);
       }
+      
+      Collections.sort(allPlaytime);
+      
+      for(IPlayerProfileComponent profile : allPlaytime){
+         if(profile == null){
+            log(1,"An error occurred loading a null profile");
+         }else{
+            String str = "\n" + profile.getPlayer().getEntityName() + " has played for a total of [" + timeToStr(profile.getTotalTime()) + "] - (" + timeToStr(profile.getActiveTime()) + " Active | " + timeToStr(profile.getAfkTime()) + " AFK) - <" + df.format(100L * profile.getAfkTime() / (profile.getTotalTime()+1)) + "%>";
+            masterString.append(str);
+         }
+      }
+      
+      source.sendFeedback(() -> Text.literal("Click to copy full dump").styled(s -> s.withClickEvent(new ClickEvent(ClickEvent.Action.COPY_TO_CLIPBOARD, masterString.toString()))),false);
+      log(0,masterString.toString());
       
       return allPlayers.size();
    }
@@ -207,7 +215,7 @@ public class LimitedAFK implements ModInitializer {
       source.sendFeedback(() -> Text.literal("")
             .append(player.getDisplayName())
             .append(Text.literal(" has an AFK percentage of ").formatted(Formatting.DARK_AQUA))
-            .append(Text.literal(df.format(100L*profile.getAfkTime()/profile.getTotalTime())).formatted(Formatting.AQUA))
+            .append(Text.literal(df.format(100L*profile.getAfkTime()/(profile.getTotalTime()+1))).formatted(Formatting.AQUA))
             .append(Text.literal("%").formatted(Formatting.AQUA)),false);
       
       return 1;

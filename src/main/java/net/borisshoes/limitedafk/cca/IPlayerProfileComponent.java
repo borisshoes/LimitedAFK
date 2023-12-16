@@ -1,10 +1,11 @@
 package net.borisshoes.limitedafk.cca;
 
 import dev.onyxstudios.cca.api.v3.component.ComponentV3;
+import net.minecraft.entity.player.PlayerEntity;
 
 import java.util.HashMap;
 
-public interface IPlayerProfileComponent extends ComponentV3 {
+public interface IPlayerProfileComponent extends ComponentV3, Comparable<IPlayerProfileComponent> {
    long getTotalTime();
    long getActiveTime();
    long getAfkTime();
@@ -18,4 +19,6 @@ public interface IPlayerProfileComponent extends ComponentV3 {
    boolean isAfk();
    void setAfk(boolean afk);
    long getStateChangeTime();
+   
+   PlayerEntity getPlayer();
 }

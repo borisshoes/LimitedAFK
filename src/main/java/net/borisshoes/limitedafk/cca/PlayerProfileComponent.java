@@ -8,6 +8,7 @@ import net.minecraft.util.Formatting;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec2f;
 import net.minecraft.util.math.Vec3d;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
 
@@ -26,6 +27,11 @@ public class PlayerProfileComponent implements IPlayerProfileComponent{
    
    public PlayerProfileComponent(PlayerEntity player){
       this.player = player;
+   }
+   
+   @Override
+   public PlayerEntity getPlayer(){
+      return player;
    }
    
    @Override
@@ -227,5 +233,10 @@ public class PlayerProfileComponent implements IPlayerProfileComponent{
    @Override
    public long getStateChangeTime(){
       return stateChangeTime;
+   }
+   
+   @Override
+   public int compareTo(@NotNull IPlayerProfileComponent o){
+      return Long.compare(o.getTotalTime(),totalTime);
    }
 }
