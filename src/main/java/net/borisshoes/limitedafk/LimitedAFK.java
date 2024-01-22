@@ -17,6 +17,7 @@ import net.fabricmc.fabric.api.event.player.UseEntityCallback;
 import net.fabricmc.fabric.api.event.player.UseItemCallback;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.network.packet.c2s.common.SyncedClientOptions;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.PlayerManager;
 import net.minecraft.server.command.ServerCommandSource;
@@ -157,7 +158,7 @@ public class LimitedAFK implements ModInitializer {
          ServerPlayerEntity reqPlayer = playerManager.getPlayer(reqProfile.getName());
          
          if(reqPlayer == null){ // Player Offline
-            reqPlayer = playerManager.createPlayer(reqProfile);
+            reqPlayer = playerManager.createPlayer(reqProfile, SyncedClientOptions.createDefault());
             server.getPlayerManager().loadPlayerData(reqPlayer);
          }
          allPlayers.add(reqPlayer);
@@ -181,7 +182,7 @@ public class LimitedAFK implements ModInitializer {
          if(profile == null){
             log(1,"An error occurred loading a null profile");
          }else{
-            String str = "\n" + profile.getPlayer().getEntityName() + " has played for a total of [" + timeToStr(profile.getTotalTime()) + "] - (" + timeToStr(profile.getActiveTime()) + " Active | " + timeToStr(profile.getAfkTime()) + " AFK) - <" + df.format(100L * profile.getAfkTime() / (profile.getTotalTime()+1)) + "%>";
+            String str = "\n" + profile.getPlayer().getNameForScoreboard() + " has played for a total of [" + timeToStr(profile.getTotalTime()) + "] - (" + timeToStr(profile.getActiveTime()) + " Active | " + timeToStr(profile.getAfkTime()) + " AFK) - <" + df.format(100L * profile.getAfkTime() / (profile.getTotalTime()+1)) + "%>";
             masterString.append(str);
          }
       }
