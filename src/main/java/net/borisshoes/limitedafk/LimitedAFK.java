@@ -158,6 +158,7 @@ public class LimitedAFK implements ModInitializer {
          
          if(reqPlayer == null){ // Player Offline
             reqPlayer = playerManager.createPlayer(reqProfile);
+            server.getPlayerManager().loadPlayerData(reqPlayer);
          }
          allPlayers.add(reqPlayer);
       }
@@ -170,7 +171,6 @@ public class LimitedAFK implements ModInitializer {
       ArrayList<IPlayerProfileComponent> allPlaytime = new ArrayList<>();
       
       for(ServerPlayerEntity player : allPlayers){
-         server.getPlayerManager().loadPlayerData(player);
          IPlayerProfileComponent profile = PLAYER_DATA.get(player);
          allPlaytime.add(profile);
       }
