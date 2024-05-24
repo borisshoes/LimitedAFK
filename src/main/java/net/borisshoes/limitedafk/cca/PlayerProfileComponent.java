@@ -2,6 +2,7 @@ package net.borisshoes.limitedafk.cca;
 
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.nbt.NbtCompound;
+import net.minecraft.registry.RegistryWrapper;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
@@ -35,7 +36,7 @@ public class PlayerProfileComponent implements IPlayerProfileComponent{
    }
    
    @Override
-   public void readFromNbt(NbtCompound tag){
+   public void readFromNbt(NbtCompound tag, RegistryWrapper.WrapperLookup registryLookup){
       lastActionTimes.clear();
       
       totalTime = tag.getLong("totalTime");
@@ -53,7 +54,7 @@ public class PlayerProfileComponent implements IPlayerProfileComponent{
    }
    
    @Override
-   public void writeToNbt(NbtCompound tag){
+   public void writeToNbt(NbtCompound tag, RegistryWrapper.WrapperLookup registryLookup){
       tag.putLong("totalTime",totalTime);
       tag.putLong("activeTime",activeTime);
       tag.putLong("afkTime",afkTime);

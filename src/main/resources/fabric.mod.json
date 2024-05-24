@@ -6,7 +6,7 @@
   "description": "Limit how much time players can AFK on your server.",
   "authors": [],
   "contact": {},
-  "license": "All-Rights-Reserved",
+  "license": "OSL-3.0",
   "icon": "assets/LimitedAFK/icon.png",
   "environment": "server",
   "entrypoints": {
