@@ -9,7 +9,7 @@ import net.minecraft.util.Identifier;
 
 public class PlayerComponentInitializer implements EntityComponentInitializer {
    public static final ComponentKey<IPlayerProfileComponent> PLAYER_DATA =
-         ComponentRegistryV3.INSTANCE.getOrCreate(new Identifier("limitedafk", "profile"), IPlayerProfileComponent.class);
+         ComponentRegistryV3.INSTANCE.getOrCreate(Identifier.of("limitedafk", "profile"), IPlayerProfileComponent.class);
    
    @Override
    public void registerEntityComponentFactories(EntityComponentFactoryRegistry registry) {
