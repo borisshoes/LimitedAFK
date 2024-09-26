@@ -165,13 +165,13 @@ public class PlayerProfileComponent implements IPlayerProfileComponent{
       boolean selectAfk = curTime - getLastActionTime("selectSlot") < afkTimer && getLastActionTime("selectSlot") > 0; // Change Equipment
       boolean chatAfk = curTime - getLastActionTime("chatMessage") < afkTimer && getLastActionTime("chatMessage") > 0; // Sent Message
       afkCount += lookAfk ? 10 : 0;
-      afkCount += moveAfk ? 3 : 0;
+      afkCount += moveAfk ? 4 : 0;
+      afkCount += selectAfk ? 3 : 0;
       afkCount += interactAfk ? 1 : 0;
       afkCount += actionAfk ? 1 : 0;
-      afkCount += selectAfk ? 1 : 0;
       afkCount += chatAfk ? 1 : 0;
       
-      boolean curAfk = afkCount < 13;
+      boolean curAfk = afkCount < 18;
       
       if((player.isCreative() || player.isSpectator()) && (boolean)config.getValue("ignoreCreativeAndSpectator")){
          curAfk = false;
