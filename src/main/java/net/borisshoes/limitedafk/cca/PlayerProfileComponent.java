@@ -1,12 +1,17 @@
 package net.borisshoes.limitedafk.cca;
 
+import net.borisshoes.limitedafk.LimitedAFK;
+import net.borisshoes.limitedafk.callbacks.TickTimerCallback;
+import net.borisshoes.limitedafk.gui.CaptchaGui;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.nbt.NbtCompound;
+import net.minecraft.network.packet.s2c.play.ClearTitleS2CPacket;
+import net.minecraft.network.packet.s2c.play.TitleFadeS2CPacket;
+import net.minecraft.network.packet.s2c.play.TitleS2CPacket;
 import net.minecraft.registry.RegistryWrapper;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
-import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec2f;
 import net.minecraft.util.math.Vec3d;
 import org.jetbrains.annotations.NotNull;
@@ -20,8 +25,10 @@ public class PlayerProfileComponent implements IPlayerProfileComponent{
    private final HashMap<String,Long> lastActionTimes = new HashMap<>();
    private final LinkedList<Vec3d> moves = new LinkedList<>();
    private final LinkedList<Vec2f> looks = new LinkedList<>();
-   private long totalTime, activeTime, afkTime, lastUpdate, stateChangeTime;
+   private long totalTime, activeTime, afkTime, lastUpdate, stateChangeTime, lastCaptcha, lastTitlePulse;
    private boolean afk;
+   private LimitedAFK.AFKLevel overrideLevel;
+   private boolean levelOverridden;
    
    // Actions:
    // Move, Player Action, Player Input, Set Held Item, Interact/Use
@@ -45,6 +52,13 @@ public class PlayerProfileComponent implements IPlayerProfileComponent{
       lastUpdate = tag.getLong("lastUpdate");
       stateChangeTime = tag.getLong("stateChangeTime");
       afk = tag.getBoolean("isAfk");
+      levelOverridden = tag.getBoolean("levelOverridden");
+
+      try{
+         overrideLevel = LimitedAFK.AFKLevel.valueOf(tag.getString("afkLevel"));
+      }catch(Exception e){
+         overrideLevel = (LimitedAFK.AFKLevel) (config.getValue("defaultAfkDetectionLevel"));
+      }
       
       NbtCompound lastActionsTag = tag.getCompound("lastActions");
       Set<String> keys = lastActionsTag.getKeys();
@@ -61,6 +75,8 @@ public class PlayerProfileComponent implements IPlayerProfileComponent{
       tag.putLong("lastUpdate",lastUpdate);
       tag.putLong("stateChangeTime",stateChangeTime);
       tag.putBoolean("isAfk",afk);
+      tag.putString("afkLevel", overrideLevel.asString());
+      tag.putBoolean("levelOverridden",levelOverridden);
       
       NbtCompound lastActionsTag = new NbtCompound();
       lastActionTimes.forEach(lastActionsTag::putLong);
@@ -171,10 +187,24 @@ public class PlayerProfileComponent implements IPlayerProfileComponent{
       afkCount += actionAfk ? 1 : 0;
       afkCount += chatAfk ? 1 : 0;
       
-      boolean curAfk = afkCount < 18;
+      boolean curAfk = afkCount < (getAfkLevel() == LimitedAFK.AFKLevel.LOW ? 15 : 17);
+      
+      if(getAfkLevel() == LimitedAFK.AFKLevel.HIGH && afkCount < 20 && player instanceof ServerPlayerEntity serverPlayer && (curTime - lastCaptcha) > 1000L * ((int)config.getValue("captchaTimer"))){
+         lastCaptcha = curTime;
+         CaptchaGui gui = new CaptchaGui(serverPlayer);
+         gui.build();
+         gui.open();
+      }
       
       if((player.isCreative() || player.isSpectator()) && (boolean)config.getValue("ignoreCreativeAndSpectator")){
          curAfk = false;
+      }
+      
+      if(curAfk && player instanceof ServerPlayerEntity serverPlayer && (curTime - lastTitlePulse) > 1000L * 30){
+         serverPlayer.networkHandler.sendPacket(new ClearTitleS2CPacket(true));
+         LimitedAFK.addTickTimerCallback(new TickTimerCallback(5, serverPlayer, () -> serverPlayer.networkHandler.sendPacket(new TitleFadeS2CPacket(10, 600, 10))));
+         LimitedAFK.addTickTimerCallback(new TickTimerCallback(10, serverPlayer, () -> serverPlayer.networkHandler.sendPacket(new TitleS2CPacket(Text.literal("You are AFK!").formatted(Formatting.RED,Formatting.BOLD)))));
+         lastTitlePulse = curTime;
       }
       
       if(curAfk && !afk){ // Switching to AFK
@@ -195,6 +225,10 @@ public class PlayerProfileComponent implements IPlayerProfileComponent{
                   Text.literal("")
                         .append(player.getDisplayName())
                         .append(" is no longer AFK").formatted(Formatting.WHITE),false);
+         }
+         
+         if(player instanceof ServerPlayerEntity serverPlayer){
+            serverPlayer.networkHandler.sendPacket(new ClearTitleS2CPacket(true));
          }
       }
       
@@ -234,6 +268,48 @@ public class PlayerProfileComponent implements IPlayerProfileComponent{
    @Override
    public long getStateChangeTime(){
       return stateChangeTime;
+   }
+   
+   @Override
+   public LimitedAFK.AFKLevel getAfkLevel(){
+      return this.levelOverridden ? this.overrideLevel : (LimitedAFK.AFKLevel) (config.getValue("defaultAfkDetectionLevel"));
+   }
+   
+   @Override
+   public void setAfkLevel(LimitedAFK.AFKLevel level){
+      this.levelOverridden = true;
+      this.overrideLevel = level;
+   }
+   
+   @Override
+   public void resetLevel(){
+      this.levelOverridden = false;
+   }
+   
+   @Override
+   public void captchaFail(){
+      long curTime = System.currentTimeMillis();
+      long afkTimeAgo = curTime - 1000L*((int)config.getValue("afkTimer"));
+      
+      // Set player as AFK
+      if(getLastActionTime("playerLook") > afkTimeAgo) updateActionTime("playerLook",afkTimeAgo - 1);
+      if(getLastActionTime("playerMove") > afkTimeAgo) updateActionTime("playerMove",afkTimeAgo - 1);
+      if(getLastActionTime("playerInteract") > afkTimeAgo) updateActionTime("playerInteract",afkTimeAgo - 1);
+      if(getLastActionTime("playerAction") > afkTimeAgo) updateActionTime("playerAction",afkTimeAgo - 1);
+      if(getLastActionTime("selectSlot") > afkTimeAgo) updateActionTime("selectSlot",afkTimeAgo - 1);
+      if(getLastActionTime("chatMessage") > afkTimeAgo) updateActionTime("chatMessage",afkTimeAgo - 1);
+   }
+   
+   @Override
+   public void captchaSuccess(){
+      // Mark player as active
+      long curTime = System.currentTimeMillis();
+      updateActionTime("playerLook",curTime);
+      updateActionTime("playerMove",curTime);
+      updateActionTime("playerInteract",curTime);
+      updateActionTime("playerAction",curTime);
+      updateActionTime("selectSlot",curTime);
+      updateActionTime("chatMessage",curTime);
    }
    
    @Override

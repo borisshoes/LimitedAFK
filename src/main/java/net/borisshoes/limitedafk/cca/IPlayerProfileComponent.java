@@ -1,5 +1,6 @@
 package net.borisshoes.limitedafk.cca;
 
+import net.borisshoes.limitedafk.LimitedAFK;
 import org.ladysnake.cca.api.v3.component.ComponentV3;
 import net.minecraft.entity.player.PlayerEntity;
 
@@ -19,6 +20,13 @@ public interface IPlayerProfileComponent extends ComponentV3, Comparable<IPlayer
    boolean isAfk();
    void setAfk(boolean afk);
    long getStateChangeTime();
+   
+   LimitedAFK.AFKLevel getAfkLevel();
+   void setAfkLevel(LimitedAFK.AFKLevel level);
+   void resetLevel();
+   
+   void captchaFail();
+   void captchaSuccess();
    
    PlayerEntity getPlayer();
 }

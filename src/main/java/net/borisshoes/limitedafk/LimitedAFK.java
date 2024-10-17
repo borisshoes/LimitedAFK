@@ -2,10 +2,7 @@ package net.borisshoes.limitedafk;
 
 import com.mojang.authlib.GameProfile;
 import com.mojang.brigadier.context.CommandContext;
-import net.borisshoes.limitedafk.callbacks.CommandRegisterCallback;
-import net.borisshoes.limitedafk.callbacks.InteractionsCallback;
-import net.borisshoes.limitedafk.callbacks.PlayerConnectionCallback;
-import net.borisshoes.limitedafk.callbacks.TickCallback;
+import net.borisshoes.limitedafk.callbacks.*;
 import net.borisshoes.limitedafk.cca.IPlayerProfileComponent;
 import net.borisshoes.limitedafk.utils.ConfigUtils;
 import net.fabricmc.api.ModInitializer;
@@ -22,12 +19,14 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.PlayerManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.ClickEvent;
 import net.minecraft.text.HoverEvent;
 import net.minecraft.text.MutableText;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.Pair;
+import net.minecraft.util.StringIdentifiable;
 import net.minecraft.util.UserCache;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -44,6 +43,8 @@ public class LimitedAFK implements ModInitializer {
    private static final String CONFIG_NAME = "LimitedAFK.properties";
    public static ConfigUtils config;
    
+   public static final ArrayList<TickTimerCallback> SERVER_TIMER_CALLBACKS = new ArrayList<>();
+   
    @Override
    public void onInitialize(){
       ServerTickEvents.END_SERVER_TICK.register(TickCallback::onTick);
@@ -55,16 +56,20 @@ public class LimitedAFK implements ModInitializer {
       AttackEntityCallback.EVENT.register(InteractionsCallback::attackEntity);
       
       config = new ConfigUtils(FabricLoader.getInstance().getConfigDir().resolve(CONFIG_NAME).toFile(), logger, Arrays.asList(new ConfigUtils.IConfigValue[] {
-            new ConfigUtils.BooleanConfigValue("enabled", true,
+            new ConfigUtils.BooleanConfigValue("enabled", true, "Is Limited AFK enabled",
                   new ConfigUtils.Command("Limiting AFK: %s", "Limiting AFK is now %s")),
-            new ConfigUtils.IntegerConfigValue("allowedAfkPercentage", 50, new ConfigUtils.IntegerConfigValue.IntLimits(0,100),
+            new ConfigUtils.IntegerConfigValue("allowedAfkPercentage", 50, new ConfigUtils.IntegerConfigValue.IntLimits(0,100),"How long can people AFK",
                   new ConfigUtils.Command("Permitted Time AFK'ing is %s percent", "Permitted Time AFK'ing is now %s percent")),
-            new ConfigUtils.BooleanConfigValue("announceAfk", true,
+            new ConfigUtils.BooleanConfigValue("announceAfk", true,"Does Limited AFK announce when people go AFK",
                   new ConfigUtils.Command("Announcing AFK is %s", "Announcing AFK is now %s")),
-            new ConfigUtils.IntegerConfigValue("afkTimer", 900, new ConfigUtils.IntegerConfigValue.IntLimits(60),
+            new ConfigUtils.IntegerConfigValue("afkTimer", 900, new ConfigUtils.IntegerConfigValue.IntLimits(60), "How long until someone is AFK",
                   new ConfigUtils.Command("Time till AFK is %s seconds", "Time till AFK is now %s seconds")),
-            new ConfigUtils.BooleanConfigValue("ignoreCreativeAndSpectator", true,
+            new ConfigUtils.BooleanConfigValue("ignoreCreativeAndSpectator", true, "Does Limited AFK track creative and spectator players",
                   new ConfigUtils.Command("Ignoring Creative and Spectators: %s", "Ignoring Creative and Spectators is now: %s")),
+            new ConfigUtils.EnumConfigValue<>("defaultAfkDetectionLevel", AFKLevel.LOW, "How aggressive is the AFK detection (LOW and MEDIUM require various levels of activity, and HIGH requires a captcha)",
+                  new ConfigUtils.Command("Ignoring Creative and Spectators: %s", "Ignoring Creative and Spectators is now: %s"), AFKLevel.class),
+            new ConfigUtils.IntegerConfigValue("captchaTimer", 600, new ConfigUtils.IntegerConfigValue.IntLimits(120), "Interval between when someone suspected of being AFK is given a captcha",
+                  new ConfigUtils.Command("The captcha timer is %s seconds", "The captcha timer is now %s seconds")),
       }));
    }
    
@@ -254,5 +259,48 @@ public class LimitedAFK implements ModInitializer {
       diff = diff.substring(0,diff.length()-1);
       
       return diff;
+   }
+   
+   public static int setAfkLevel(CommandContext<ServerCommandSource> context, ServerPlayerEntity player, AFKLevel level){
+      if(level == null){
+         context.getSource().sendError(Text.literal("Invalid AFK Level"));
+         return -1;
+      }
+      PLAYER_DATA.get(player).setAfkLevel(level);
+      context.getSource().sendFeedback(() -> Text.literal(player.getNameForScoreboard()+"'s AFK Level is now "+PLAYER_DATA.get(player).getAfkLevel().asString()),false);
+      return 1;
+   }
+   
+   public static int getAfkLevel(CommandContext<ServerCommandSource> context, ServerPlayerEntity player){
+      context.getSource().sendFeedback(() -> Text.literal(player.getNameForScoreboard()+"'s AFK Level is "+PLAYER_DATA.get(player).getAfkLevel().asString()),false);
+      return 1;
+   }
+   
+   public static int resetAfkLevel(CommandContext<ServerCommandSource> context, ServerPlayerEntity player){
+      PLAYER_DATA.get(player).resetLevel();
+      context.getSource().sendFeedback(() -> Text.literal("Reset "+player.getNameForScoreboard()+"'s AFK Level"),false);
+      return 1;
+   }
+   
+   public static boolean addTickTimerCallback(TickTimerCallback callback){
+      return SERVER_TIMER_CALLBACKS.add(callback);
+   }
+   
+   
+   public enum AFKLevel implements StringIdentifiable {
+      LOW("LOW"),
+      MEDIUM("MEDIUM"),
+      HIGH("HIGH");
+      
+      private final String id;
+      
+      AFKLevel(String id){
+         this.id = id;
+      }
+      
+      @Override
+      public String asString(){
+         return this.id;
+      }
    }
 }
