@@ -75,8 +75,13 @@ public class PlayerProfileComponent implements IPlayerProfileComponent{
       tag.putLong("lastUpdate",lastUpdate);
       tag.putLong("stateChangeTime",stateChangeTime);
       tag.putBoolean("isAfk",afk);
-      tag.putString("afkLevel", overrideLevel.asString());
       tag.putBoolean("levelOverridden",levelOverridden);
+      
+      try{
+         tag.putString("afkLevel", overrideLevel.asString());
+      }catch(Exception e){
+         tag.putString("afkLevel", ((LimitedAFK.AFKLevel) (config.getValue("defaultAfkDetectionLevel"))).asString());
+      }
       
       NbtCompound lastActionsTag = new NbtCompound();
       lastActionTimes.forEach(lastActionsTag::putLong);

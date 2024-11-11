@@ -67,7 +67,7 @@ public class LimitedAFK implements ModInitializer {
             new ConfigUtils.BooleanConfigValue("ignoreCreativeAndSpectator", true, "Does Limited AFK track creative and spectator players",
                   new ConfigUtils.Command("Ignoring Creative and Spectators: %s", "Ignoring Creative and Spectators is now: %s")),
             new ConfigUtils.EnumConfigValue<>("defaultAfkDetectionLevel", AFKLevel.LOW, "How aggressive is the AFK detection (LOW and MEDIUM require various levels of activity, and HIGH requires a captcha)",
-                  new ConfigUtils.Command("Ignoring Creative and Spectators: %s", "Ignoring Creative and Spectators is now: %s"), AFKLevel.class),
+                  new ConfigUtils.Command("Default AFK detection level: %s", "Default AFK detection level is now: %s"), AFKLevel.class),
             new ConfigUtils.IntegerConfigValue("captchaTimer", 600, new ConfigUtils.IntegerConfigValue.IntLimits(120), "Interval between when someone suspected of being AFK is given a captcha",
                   new ConfigUtils.Command("The captcha timer is %s seconds", "The captcha timer is now %s seconds")),
       }));
