@@ -2,7 +2,6 @@ package net.borisshoes.limitedafk.mixins;
 
 import net.minecraft.network.message.MessageType;
 import net.minecraft.network.message.SignedMessage;
-import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.PlayerManager;
 import net.minecraft.server.network.ServerPlayerEntity;
 import org.spongepowered.asm.mixin.Mixin;

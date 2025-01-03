@@ -6,10 +6,8 @@ import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
-import com.mojang.brigadier.suggestion.SuggestionProvider;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
-import net.minecraft.command.argument.EnumArgumentType;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.text.MutableText;
 import net.minecraft.text.TranslatableTextContent;
@@ -81,19 +79,19 @@ public class ConfigUtils {
             literal("limitedafk").then(literal("config").requires(source -> source.hasPermissionLevel(4))
                   .executes(ctx -> {
                      values.stream().filter(v -> v.command != null).forEach(value ->
-                           ctx.getSource().sendFeedback(() -> MutableText.of(new TranslatableTextContent(value.command.getterText, null, new Object[] {value.value})), false));
+                           ctx.getSource().sendFeedback(() -> MutableText.of(new TranslatableTextContent(value.command.getterText, null, new String[] {value.value.toString()})), false));
                      return 1;
                   }));
       values.stream().filter(v -> v.command != null).forEach(value ->
             out.then(literal("config").then(literal(value.name)
                   .executes(ctx -> {
-                     ctx.getSource().sendFeedback(() -> MutableText.of(new TranslatableTextContent(value.command.getterText, null, new Object[] {value.value})), false);
+                     ctx.getSource().sendFeedback(() -> MutableText.of(new TranslatableTextContent(value.command.getterText, null, new String[] {value.value.toString()})), false);
                      return 1;
                   })
                   .then(argument(value.name, value.getArgumentType()).suggests(value::getSuggestions)
                         .executes(ctx -> {
                            value.value = value.parseArgumentValue(ctx);
-                           ((CommandContext<ServerCommandSource>) ctx).getSource().sendFeedback(() -> MutableText.of(new TranslatableTextContent(value.command.setterText, null, new Object[] {value.value})), true);
+                           ((CommandContext<ServerCommandSource>) ctx).getSource().sendFeedback(() -> MutableText.of(new TranslatableTextContent(value.command.setterText, null, new String[] {value.value.toString()})), true);
                            this.save();
                            return 1;
                         })))));
@@ -163,7 +161,7 @@ public class ConfigUtils {
       
       public CompletableFuture<Suggestions> getSuggestions(CommandContext<ServerCommandSource> context, SuggestionsBuilder builder){
          if(limits.max - limits.min < 10000){
-            String start = builder.getRemaining().toLowerCase();
+            String start = builder.getRemaining().toLowerCase(Locale.ROOT);
             Set<String> nums = new HashSet<>();
             for(int i = limits.min; i <= limits.max; i++){
                nums.add(String.valueOf(i));
@@ -216,8 +214,8 @@ public class ConfigUtils {
          Set<String> options = new HashSet<>();
          options.add("true");
          options.add("false");
-         String start = builder.getRemaining().toLowerCase();
-         options.stream().filter(s -> s.toLowerCase().startsWith(start)).forEach(builder::suggest);
+         String start = builder.getRemaining().toLowerCase(Locale.ROOT);
+         options.stream().filter(s -> s.toLowerCase(Locale.ROOT).startsWith(start)).forEach(builder::suggest);
          return builder.buildFuture();
       }
    }
@@ -248,8 +246,8 @@ public class ConfigUtils {
       }
       
       public CompletableFuture<Suggestions> getSuggestions(CommandContext<ServerCommandSource> context, SuggestionsBuilder builder){
-         String start = builder.getRemaining().toLowerCase();
-         Arrays.stream(options).filter(s -> s.toLowerCase().startsWith(start)).forEach(builder::suggest);
+         String start = builder.getRemaining().toLowerCase(Locale.ROOT);
+         Arrays.stream(options).filter(s -> s.toLowerCase(Locale.ROOT).startsWith(start)).forEach(builder::suggest);
          return builder.buildFuture();
       }
    }
@@ -295,8 +293,8 @@ public class ConfigUtils {
          for(K k : EnumSet.allOf(typeClass)){
             options.add(k.asString());
          }
-         String start = builder.getRemaining().toLowerCase();
-         options.stream().filter(s -> s.toLowerCase().startsWith(start)).forEach(builder::suggest);
+         String start = builder.getRemaining().toLowerCase(Locale.ROOT);
+         options.stream().filter(s -> s.toLowerCase(Locale.ROOT).startsWith(start)).forEach(builder::suggest);
          return builder.buildFuture();
       }
    }
@@ -322,8 +320,8 @@ public class ConfigUtils {
       for(K k : EnumSet.allOf(enumClass)){
          options.add(k.asString());
       }
-      String start = builder.getRemaining().toLowerCase();
-      options.stream().filter(s -> s.toLowerCase().startsWith(start)).forEach(builder::suggest);
+      String start = builder.getRemaining().toLowerCase(Locale.ROOT);
+      options.stream().filter(s -> s.toLowerCase(Locale.ROOT).startsWith(start)).forEach(builder::suggest);
       return builder.buildFuture();
    }
    

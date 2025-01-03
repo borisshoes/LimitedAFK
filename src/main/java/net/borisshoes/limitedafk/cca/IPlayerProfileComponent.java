@@ -1,8 +1,8 @@
 package net.borisshoes.limitedafk.cca;
 
 import net.borisshoes.limitedafk.LimitedAFK;
-import org.ladysnake.cca.api.v3.component.ComponentV3;
 import net.minecraft.entity.player.PlayerEntity;
+import org.ladysnake.cca.api.v3.component.ComponentV3;
 
 import java.util.HashMap;
 

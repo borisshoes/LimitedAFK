@@ -6,7 +6,6 @@ import net.minecraft.server.PlayerManager;
 import net.minecraft.server.network.ServerPlayerEntity;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 
 import static net.borisshoes.limitedafk.LimitedAFK.SERVER_TIMER_CALLBACKS;

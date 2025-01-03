@@ -1,11 +1,11 @@
 package net.borisshoes.limitedafk.cca;
 
+import net.minecraft.util.Identifier;
 import org.ladysnake.cca.api.v3.component.ComponentKey;
 import org.ladysnake.cca.api.v3.component.ComponentRegistryV3;
 import org.ladysnake.cca.api.v3.entity.EntityComponentFactoryRegistry;
 import org.ladysnake.cca.api.v3.entity.EntityComponentInitializer;
 import org.ladysnake.cca.api.v3.entity.RespawnCopyStrategy;
-import net.minecraft.util.Identifier;
 
 public class PlayerComponentInitializer implements EntityComponentInitializer {
    public static final ComponentKey<IPlayerProfileComponent> PLAYER_DATA =

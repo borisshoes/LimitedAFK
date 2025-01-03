@@ -1,6 +1,5 @@
 package net.borisshoes.limitedafk.callbacks;
 
-import net.minecraft.item.ItemStack;
 import net.minecraft.server.network.ServerPlayerEntity;
 import org.jetbrains.annotations.Nullable;
 
