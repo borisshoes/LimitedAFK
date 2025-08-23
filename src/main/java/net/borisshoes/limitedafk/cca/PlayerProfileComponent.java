@@ -46,24 +46,24 @@ public class PlayerProfileComponent implements IPlayerProfileComponent{
    public void readFromNbt(NbtCompound tag, RegistryWrapper.WrapperLookup registryLookup){
       lastActionTimes.clear();
       
-      totalTime = tag.getLong("totalTime");
-      activeTime = tag.getLong("activeTime");
-      afkTime = tag.getLong("afkTime");
-      lastUpdate = tag.getLong("lastUpdate");
-      stateChangeTime = tag.getLong("stateChangeTime");
-      afk = tag.getBoolean("isAfk");
-      levelOverridden = tag.getBoolean("levelOverridden");
+      totalTime = tag.getLong("totalTime",0L);
+      activeTime = tag.getLong("activeTime",0L);
+      afkTime = tag.getLong("afkTime",0L);
+      lastUpdate = tag.getLong("lastUpdate",0L);
+      stateChangeTime = tag.getLong("stateChangeTime",0L);
+      afk = tag.getBoolean("isAfk",false);
+      levelOverridden = tag.getBoolean("levelOverridden",false);
 
       try{
-         overrideLevel = LimitedAFK.AFKLevel.valueOf(tag.getString("afkLevel"));
+         overrideLevel = LimitedAFK.AFKLevel.valueOf(tag.getString("afkLevel",""));
       }catch(Exception e){
          overrideLevel = (LimitedAFK.AFKLevel) (config.getValue("defaultAfkDetectionLevel"));
       }
       
-      NbtCompound lastActionsTag = tag.getCompound("lastActions");
+      NbtCompound lastActionsTag = tag.getCompound("lastActions").orElse(new NbtCompound());
       Set<String> keys = lastActionsTag.getKeys();
       keys.forEach(key ->{
-         lastActionTimes.put(key,lastActionsTag.getLong(key));
+         lastActionTimes.put(key,lastActionsTag.getLong(key,0L));
       });
    }
    

@@ -187,7 +187,7 @@ public class LimitedAFK implements ModInitializer {
          }
       }
       
-      source.sendFeedback(() -> Text.literal("Click to copy full dump").styled(s -> s.withClickEvent(new ClickEvent(ClickEvent.Action.COPY_TO_CLIPBOARD, masterString.toString()))),false);
+      source.sendFeedback(() -> Text.literal("Click to copy full dump").styled(s -> s.withClickEvent(new ClickEvent.CopyToClipboard(masterString.toString()))),false);
       log(0,masterString.toString());
       
       return allPlayers.size();
