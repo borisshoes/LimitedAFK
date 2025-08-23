@@ -10,6 +10,8 @@ import net.minecraft.network.packet.s2c.play.TitleFadeS2CPacket;
 import net.minecraft.network.packet.s2c.play.TitleS2CPacket;
 import net.minecraft.registry.RegistryWrapper;
 import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.math.Vec2f;
@@ -43,24 +45,24 @@ public class PlayerProfileComponent implements IPlayerProfileComponent{
    }
    
    @Override
-   public void readFromNbt(NbtCompound tag, RegistryWrapper.WrapperLookup registryLookup){
+   public void readData(ReadView view){
       lastActionTimes.clear();
       
-      totalTime = tag.getLong("totalTime",0L);
-      activeTime = tag.getLong("activeTime",0L);
-      afkTime = tag.getLong("afkTime",0L);
-      lastUpdate = tag.getLong("lastUpdate",0L);
-      stateChangeTime = tag.getLong("stateChangeTime",0L);
-      afk = tag.getBoolean("isAfk",false);
-      levelOverridden = tag.getBoolean("levelOverridden",false);
+      totalTime = view.getLong("totalTime",0L);
+      activeTime = view.getLong("activeTime",0L);
+      afkTime = view.getLong("afkTime",0L);
+      lastUpdate = view.getLong("lastUpdate",0L);
+      stateChangeTime = view.getLong("stateChangeTime",0L);
+      afk = view.getBoolean("isAfk",false);
+      levelOverridden = view.getBoolean("levelOverridden",false);
 
       try{
-         overrideLevel = LimitedAFK.AFKLevel.valueOf(tag.getString("afkLevel",""));
+         overrideLevel = LimitedAFK.AFKLevel.valueOf(view.getString("afkLevel",""));
       }catch(Exception e){
          overrideLevel = (LimitedAFK.AFKLevel) (config.getValue("defaultAfkDetectionLevel"));
       }
       
-      NbtCompound lastActionsTag = tag.getCompound("lastActions").orElse(new NbtCompound());
+      NbtCompound lastActionsTag = view.read("lastActions",NbtCompound.CODEC).orElse(new NbtCompound());
       Set<String> keys = lastActionsTag.getKeys();
       keys.forEach(key ->{
          lastActionTimes.put(key,lastActionsTag.getLong(key,0L));
@@ -68,24 +70,24 @@ public class PlayerProfileComponent implements IPlayerProfileComponent{
    }
    
    @Override
-   public void writeToNbt(NbtCompound tag, RegistryWrapper.WrapperLookup registryLookup){
-      tag.putLong("totalTime",totalTime);
-      tag.putLong("activeTime",activeTime);
-      tag.putLong("afkTime",afkTime);
-      tag.putLong("lastUpdate",lastUpdate);
-      tag.putLong("stateChangeTime",stateChangeTime);
-      tag.putBoolean("isAfk",afk);
-      tag.putBoolean("levelOverridden",levelOverridden);
+   public void writeData(WriteView view){
+      view.putLong("totalTime",totalTime);
+      view.putLong("activeTime",activeTime);
+      view.putLong("afkTime",afkTime);
+      view.putLong("lastUpdate",lastUpdate);
+      view.putLong("stateChangeTime",stateChangeTime);
+      view.putBoolean("isAfk",afk);
+      view.putBoolean("levelOverridden",levelOverridden);
       
       try{
-         tag.putString("afkLevel", overrideLevel.asString());
+         view.putString("afkLevel", overrideLevel.asString());
       }catch(Exception e){
-         tag.putString("afkLevel", ((LimitedAFK.AFKLevel) (config.getValue("defaultAfkDetectionLevel"))).asString());
+         view.putString("afkLevel", ((LimitedAFK.AFKLevel) (config.getValue("defaultAfkDetectionLevel"))).asString());
       }
       
       NbtCompound lastActionsTag = new NbtCompound();
       lastActionTimes.forEach(lastActionsTag::putLong);
-      tag.put("lastActions",lastActionsTag);
+      view.put("lastActions",NbtCompound.CODEC,lastActionsTag);
    }
    
    @Override

@@ -2,8 +2,10 @@ package net.borisshoes.limitedafk;
 
 import com.mojang.authlib.GameProfile;
 import com.mojang.brigadier.context.CommandContext;
+import com.mojang.logging.LogUtils;
 import net.borisshoes.limitedafk.callbacks.*;
 import net.borisshoes.limitedafk.cca.IPlayerProfileComponent;
+import net.borisshoes.limitedafk.mixins.EntityAccessor;
 import net.borisshoes.limitedafk.utils.ConfigUtils;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
@@ -15,15 +17,17 @@ import net.fabricmc.fabric.api.event.player.UseItemCallback;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.network.packet.c2s.common.SyncedClientOptions;
+import net.minecraft.registry.RegistryKey;
+import net.minecraft.registry.RegistryKeys;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.PlayerManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.world.ServerWorld;
+import net.minecraft.storage.ReadView;
 import net.minecraft.text.ClickEvent;
 import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-import net.minecraft.util.StringIdentifiable;
-import net.minecraft.util.UserCache;
+import net.minecraft.util.*;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -148,19 +152,13 @@ public class LimitedAFK implements ModInitializer {
    public static int playtimeAllCmd(CommandContext<ServerCommandSource> context){
       ServerCommandSource source = context.getSource();
       MinecraftServer server = source.getServer();
-      PlayerManager playerManager = server.getPlayerManager();
       UserCache userCache = server.getUserCache();
       List<ServerPlayerEntity> allPlayers = new ArrayList<>();
       List<UserCache.Entry> cacheEntries = userCache.load();
       
       for(UserCache.Entry cacheEntry : cacheEntries){
          GameProfile reqProfile = cacheEntry.getProfile();
-         ServerPlayerEntity reqPlayer = playerManager.getPlayer(reqProfile.getName());
-         
-         if(reqPlayer == null){ // Player Offline
-            reqPlayer = playerManager.createPlayer(reqProfile, SyncedClientOptions.createDefault());
-            server.getPlayerManager().loadPlayerData(reqPlayer);
-         }
+         ServerPlayerEntity reqPlayer = getRequestedPlayer(server, reqProfile);
          allPlayers.add(reqPlayer);
       }
       
@@ -279,6 +277,26 @@ public class LimitedAFK implements ModInitializer {
    
    public static boolean addTickTimerCallback(TickTimerCallback callback){
       return SERVER_TIMER_CALLBACKS.add(callback);
+   }
+   
+   public static ServerPlayerEntity getRequestedPlayer(MinecraftServer server, GameProfile requestedProfile){
+      ServerPlayerEntity requestedPlayer = server.getPlayerManager().getPlayer(requestedProfile.getName());
+      
+      if (requestedPlayer == null) {
+         requestedPlayer = new ServerPlayerEntity(server, server.getOverworld(), requestedProfile, SyncedClientOptions.createDefault());
+         Optional<ReadView> readViewOpt = server.getPlayerManager().loadPlayerData(requestedPlayer, new ErrorReporter.Logging(LogUtils.getLogger()));
+         
+         if (readViewOpt.isPresent()) {
+            ReadView readView = readViewOpt.get();
+            Optional<String> dimension = readView.getOptionalString("Dimension");
+            
+            if (dimension.isPresent()) {
+               ServerWorld world = server.getWorld(RegistryKey.of(RegistryKeys.WORLD, Identifier.tryParse(dimension.get())));
+               if(world != null) ((EntityAccessor) requestedPlayer).callSetWorld(world);
+            }
+         }
+      }
+      return requestedPlayer;
    }
    
    
