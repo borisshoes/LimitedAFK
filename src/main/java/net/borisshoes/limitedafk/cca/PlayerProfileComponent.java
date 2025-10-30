@@ -132,7 +132,7 @@ public class PlayerProfileComponent implements IPlayerProfileComponent{
    private void checkMoveAndLook(){
       long curTime = System.currentTimeMillis();
       // Add New Elements and Remove Old
-      moves.add(player.getPos());
+      moves.add(player.getEntityPos());
       while(moves.size() > 10){
          moves.remove();
       }
@@ -196,15 +196,15 @@ public class PlayerProfileComponent implements IPlayerProfileComponent{
       
       boolean curAfk = afkCount < (getAfkLevel() == LimitedAFK.AFKLevel.LOW ? 15 : 17);
       
-      if(getAfkLevel() == LimitedAFK.AFKLevel.HIGH && afkCount < 20 && player instanceof ServerPlayerEntity serverPlayer && (curTime - lastCaptcha) > 1000L * ((int)config.getValue("captchaTimer"))){
-         lastCaptcha = curTime;
-         CaptchaGui gui = new CaptchaGui(serverPlayer);
-         gui.build();
-         gui.open();
-      }
-      
       if((player.isCreative() || player.isSpectator()) && (boolean)config.getValue("ignoreCreativeAndSpectator")){
          curAfk = false;
+      }else{
+         if(getAfkLevel() == LimitedAFK.AFKLevel.HIGH && afkCount < 20 && player instanceof ServerPlayerEntity serverPlayer && (curTime - lastCaptcha) > 1000L * ((int)config.getValue("captchaTimer"))){
+            lastCaptcha = curTime;
+            CaptchaGui gui = new CaptchaGui(serverPlayer);
+            gui.build();
+            gui.open();
+         }
       }
       
       if(curAfk && player instanceof ServerPlayerEntity serverPlayer && (curTime - lastTitlePulse) > 1000L * 30){
@@ -218,7 +218,7 @@ public class PlayerProfileComponent implements IPlayerProfileComponent{
          stateChangeTime = curTime;
          
          if((boolean)config.getValue("announceAfk")){
-            player.getServer().getPlayerManager().broadcast(
+            player.getEntityWorld().getServer().getPlayerManager().broadcast(
                   Text.literal("")
                         .append(player.getDisplayName())
                         .append(" is now AFK").formatted(Formatting.WHITE),false);
@@ -228,7 +228,7 @@ public class PlayerProfileComponent implements IPlayerProfileComponent{
          stateChangeTime = curTime;
          
          if((boolean)config.getValue("announceAfk")){
-            player.getServer().getPlayerManager().broadcast(
+            player.getEntityWorld().getServer().getPlayerManager().broadcast(
                   Text.literal("")
                         .append(player.getDisplayName())
                         .append(" is no longer AFK").formatted(Formatting.WHITE),false);

@@ -20,10 +20,12 @@ import net.minecraft.network.packet.c2s.common.SyncedClientOptions;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.PlayerConfigEntry;
 import net.minecraft.server.PlayerManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.storage.NbtReadView;
 import net.minecraft.storage.ReadView;
 import net.minecraft.text.ClickEvent;
 import net.minecraft.text.Text;
@@ -152,14 +154,20 @@ public class LimitedAFK implements ModInitializer {
    public static int playtimeAllCmd(CommandContext<ServerCommandSource> context){
       ServerCommandSource source = context.getSource();
       MinecraftServer server = source.getServer();
-      UserCache userCache = server.getUserCache();
+      NameToIdCache baseCache = server.getApiServices().nameToIdCache();
       List<ServerPlayerEntity> allPlayers = new ArrayList<>();
-      List<UserCache.Entry> cacheEntries = userCache.load();
-      
-      for(UserCache.Entry cacheEntry : cacheEntries){
-         GameProfile reqProfile = cacheEntry.getProfile();
-         ServerPlayerEntity reqPlayer = getRequestedPlayer(server, reqProfile);
-         allPlayers.add(reqPlayer);
+      if(baseCache instanceof UserCache userCache){
+         List<UserCache.Entry> cacheEntries = userCache.load();
+         
+         for(UserCache.Entry cacheEntry : cacheEntries){
+            Optional<GameProfile> opt = server.getApiServices().profileResolver().getProfileById(cacheEntry.getPlayer().id());;
+            if(opt.isEmpty()) continue;
+            GameProfile reqProfile = opt.get();
+            ServerPlayerEntity reqPlayer = getRequestedPlayer(server, reqProfile);
+            allPlayers.add(reqPlayer);
+         }
+      }else{
+         log(2,"Was unable to pull player data");
       }
       
       DecimalFormat df = new DecimalFormat("#.00");
@@ -280,11 +288,15 @@ public class LimitedAFK implements ModInitializer {
    }
    
    public static ServerPlayerEntity getRequestedPlayer(MinecraftServer server, GameProfile requestedProfile){
-      ServerPlayerEntity requestedPlayer = server.getPlayerManager().getPlayer(requestedProfile.getName());
+      ServerPlayerEntity requestedPlayer = server.getPlayerManager().getPlayer(requestedProfile.name());
       
       if (requestedPlayer == null) {
          requestedPlayer = new ServerPlayerEntity(server, server.getOverworld(), requestedProfile, SyncedClientOptions.createDefault());
-         Optional<ReadView> readViewOpt = server.getPlayerManager().loadPlayerData(requestedPlayer, new ErrorReporter.Logging(LogUtils.getLogger()));
+         Optional<ReadView> readViewOpt = server
+               .getPlayerManager()
+               .loadPlayerData(new PlayerConfigEntry(requestedProfile))
+               .map(playerData -> NbtReadView.create(new ErrorReporter.Logging(LogUtils.getLogger()), server.getRegistryManager(), playerData));
+         readViewOpt.ifPresent(requestedPlayer::readData);
          
          if (readViewOpt.isPresent()) {
             ReadView readView = readViewOpt.get();
