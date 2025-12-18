@@ -2,11 +2,19 @@ package net.borisshoes.limitedafk;
 
 import com.mojang.authlib.GameProfile;
 import com.mojang.brigadier.context.CommandContext;
-import com.mojang.logging.LogUtils;
-import net.borisshoes.limitedafk.callbacks.*;
-import net.borisshoes.limitedafk.cca.IPlayerProfileComponent;
-import net.borisshoes.limitedafk.mixins.EntityAccessor;
-import net.borisshoes.limitedafk.utils.ConfigUtils;
+import com.mojang.serialization.Lifecycle;
+import net.borisshoes.borislib.config.ConfigManager;
+import net.borisshoes.borislib.config.ConfigSetting;
+import net.borisshoes.borislib.config.IConfigSetting;
+import net.borisshoes.borislib.config.values.BooleanConfigValue;
+import net.borisshoes.borislib.config.values.EnumConfigValue;
+import net.borisshoes.borislib.config.values.IntConfigValue;
+import net.borisshoes.borislib.datastorage.DataAccess;
+import net.borisshoes.borislib.utils.MinecraftUtils;
+import net.borisshoes.limitedafk.callbacks.CommandRegisterCallback;
+import net.borisshoes.limitedafk.callbacks.InteractionsCallback;
+import net.borisshoes.limitedafk.callbacks.PlayerConnectionCallback;
+import net.borisshoes.limitedafk.callbacks.TickCallback;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
@@ -15,36 +23,61 @@ import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.fabricmc.fabric.api.event.player.UseEntityCallback;
 import net.fabricmc.fabric.api.event.player.UseItemCallback;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
-import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.network.packet.c2s.common.SyncedClientOptions;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.registry.RegistryKeys;
+import net.minecraft.ChatFormatting;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.core.MappedRegistry;
+import net.minecraft.core.Registry;
+import net.minecraft.network.chat.ClickEvent;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.PlayerConfigEntry;
-import net.minecraft.server.PlayerManager;
-import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.storage.NbtReadView;
-import net.minecraft.storage.ReadView;
-import net.minecraft.text.ClickEvent;
-import net.minecraft.text.Text;
-import net.minecraft.util.*;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.players.CachedUserNameToIdResolver;
+import net.minecraft.server.players.NameAndId;
+import net.minecraft.server.players.PlayerList;
+import net.minecraft.server.players.UserNameToIdResolver;
+import net.minecraft.util.StringRepresentable;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.text.DecimalFormat;
 import java.util.*;
-
-import static net.borisshoes.limitedafk.cca.PlayerComponentInitializer.PLAYER_DATA;
 
 public class LimitedAFK implements ModInitializer {
    
-   private static final Logger logger = LogManager.getLogger("Limited AFK");
+   public static final Logger LOGGER = LogManager.getLogger("Limited AFK");
    private static final String CONFIG_NAME = "LimitedAFK.properties";
-   public static ConfigUtils config;
+   public static final String MOD_ID = "limitedafk";
+   public static ConfigManager CONFIG;
    
-   public static final ArrayList<TickTimerCallback> SERVER_TIMER_CALLBACKS = new ArrayList<>();
+   public static final Registry<IConfigSetting<?>> CONFIG_SETTINGS = new MappedRegistry<>(ResourceKey.createRegistryKey(Identifier.fromNamespaceAndPath(MOD_ID,"config_settings")), Lifecycle.stable());
+   
+   public static final IConfigSetting<?> ENABLED = registerConfigSetting(new ConfigSetting<>(
+         new BooleanConfigValue("enabled", true)));
+   
+   public static final IConfigSetting<?> ALLOWED_AFK_PERCENTAGE = registerConfigSetting(new ConfigSetting<>(
+         new IntConfigValue("allowedAfkPercentage", 50, new IntConfigValue.IntLimits(0, 100))));
+   
+   public static final IConfigSetting<?> ANNOUNCE_AFK = registerConfigSetting(new ConfigSetting<>(
+         new BooleanConfigValue("announceAfk", true)));
+   
+   public static final IConfigSetting<?> AFK_TIMER = registerConfigSetting(new ConfigSetting<>(
+         new IntConfigValue("afkTimer", 900, new IntConfigValue.IntLimits(60))));
+   
+   public static final IConfigSetting<?> IGNORE_CREATIVE_AND_SPECTATOR = registerConfigSetting(new ConfigSetting<>(
+         new BooleanConfigValue("ignoreCreativeAndSpectator", true)));
+   
+   public static final IConfigSetting<?> DEFAULT_AFK_DETECTION_LEVEL = registerConfigSetting(new ConfigSetting<>(
+         new EnumConfigValue<>("defaultAfkDetectionLevel", AFKLevel.LOW, AFKLevel.class)));
+   
+   public static final IConfigSetting<?> CAPTCHA_TIMER = registerConfigSetting(new ConfigSetting<>(
+         new IntConfigValue("captchaTimer", 600, new IntConfigValue.IntLimits(120))));
+   
+   private static IConfigSetting<?> registerConfigSetting(IConfigSetting<?> setting){
+      Registry.register(CONFIG_SETTINGS, Identifier.fromNamespaceAndPath(MOD_ID,setting.getId()),setting);
+      return setting;
+   }
    
    @Override
    public void onInitialize(){
@@ -56,25 +89,8 @@ public class LimitedAFK implements ModInitializer {
       UseBlockCallback.EVENT.register(InteractionsCallback::useBlock);
       AttackEntityCallback.EVENT.register(InteractionsCallback::attackEntity);
       
-      config = new ConfigUtils(FabricLoader.getInstance().getConfigDir().resolve(CONFIG_NAME).toFile(), logger, Arrays.asList(new ConfigUtils.IConfigValue[] {
-            new ConfigUtils.BooleanConfigValue("enabled", true, "Is Limited AFK enabled",
-                  new ConfigUtils.Command("Limiting AFK: %s", "Limiting AFK is now %s")),
-            new ConfigUtils.IntegerConfigValue("allowedAfkPercentage", 50, new ConfigUtils.IntegerConfigValue.IntLimits(0,100),"How long can people AFK",
-                  new ConfigUtils.Command("Permitted Time AFK'ing is %s percent", "Permitted Time AFK'ing is now %s percent")),
-            new ConfigUtils.BooleanConfigValue("announceAfk", true,"Does Limited AFK announce when people go AFK",
-                  new ConfigUtils.Command("Announcing AFK is %s", "Announcing AFK is now %s")),
-            new ConfigUtils.IntegerConfigValue("afkTimer", 900, new ConfigUtils.IntegerConfigValue.IntLimits(60), "How long until someone is AFK",
-                  new ConfigUtils.Command("Time till AFK is %s seconds", "Time till AFK is now %s seconds")),
-            new ConfigUtils.BooleanConfigValue("ignoreCreativeAndSpectator", true, "Does Limited AFK track creative and spectator players",
-                  new ConfigUtils.Command("Ignoring Creative and Spectators: %s", "Ignoring Creative and Spectators is now: %s")),
-            new ConfigUtils.EnumConfigValue<>("defaultAfkDetectionLevel", AFKLevel.LOW, "How aggressive is the AFK detection (LOW and MEDIUM require various levels of activity, and HIGH requires a captcha)",
-                  new ConfigUtils.Command("Default AFK detection level: %s", "Default AFK detection level is now: %s"), AFKLevel.class),
-            new ConfigUtils.IntegerConfigValue("captchaTimer", 600, new ConfigUtils.IntegerConfigValue.IntLimits(120), "Interval between when someone suspected of being AFK is given a captcha",
-                  new ConfigUtils.Command("The captcha timer is %s seconds", "The captcha timer is now %s seconds")),
-      }));
+      CONFIG = new ConfigManager(MOD_ID,"Ancestral Archetypes",CONFIG_NAME,CONFIG_SETTINGS);
    }
-   
-   
    
    /**
     * Uses built in logger to log a message
@@ -83,236 +99,244 @@ public class LimitedAFK implements ModInitializer {
     */
    public static void log(int level, String msg){
       switch(level){
-         case 0 -> logger.info(msg);
-         case 1 -> logger.warn(msg);
-         case 2 -> logger.error(msg);
-         case 3 -> logger.fatal(msg);
-         default -> logger.debug(msg);
+         case 0 -> LOGGER.info(msg);
+         case 1 -> LOGGER.warn(msg);
+         case 2 -> LOGGER.error(msg);
+         case 3 -> LOGGER.fatal(msg);
+         default -> LOGGER.debug(msg);
       }
    }
    
-   public static int listAfkCmd(CommandContext<ServerCommandSource> context){
-      ServerCommandSource source = context.getSource();
+   public static int listAfkCmd(CommandContext<CommandSourceStack> context){
+      CommandSourceStack source = context.getSource();
       MinecraftServer server = source.getServer();
-      PlayerManager playerManager = server.getPlayerManager();
-      List<ServerPlayerEntity> players = playerManager.getPlayerList();
+      PlayerList playerManager = server.getPlayerList();
+      List<ServerPlayer> players = playerManager.getPlayers();
       
       int afkCount = 0;
       
-      source.sendFeedback(() -> Text.literal("===== Players ====="),false);
-      for(ServerPlayerEntity player : players){
-         IPlayerProfileComponent profile = PLAYER_DATA.get(player);
+      source.sendSuccess(() -> Component.translatable("text.limitedafk.players_header"),false);
+      for(ServerPlayer player : players){
+         PlayerData profile = DataAccess.getPlayer(player.getUUID(),PlayerData.KEY);
          boolean afk = profile.isAfk();
          if(afk){
             afkCount++;
          }
-         source.sendFeedback(() -> Text.literal("")
-               .append(player.getDisplayName())
-               .append(Text.literal(" - ").formatted(Formatting.WHITE))
-               .append(Text.literal(afk ? "AFK" : "Active").formatted(afk ? Formatting.RED : Formatting.GREEN))
-               .append(Text.literal(" for [").formatted(Formatting.WHITE))
-               .append(Text.literal(timeToStr(System.currentTimeMillis() - profile.getStateChangeTime())).formatted(Formatting.GRAY))
-               .append(Text.literal("]").formatted(Formatting.WHITE)),false);
+         source.sendSuccess(() -> Component.translatable("text.limitedafk.player_status",
+               player.getDisplayName(),
+               Component.translatable(afk ? "text.limitedafk.status_afk" : "text.limitedafk.status_active").withStyle(afk ? ChatFormatting.RED : ChatFormatting.GREEN),
+               timeToStr(System.currentTimeMillis() - profile.getStateChangeTime()).withStyle(ChatFormatting.GRAY)),false);
       }
-      source.sendFeedback(() -> Text.literal("==================="),false);
+      source.sendSuccess(() -> Component.translatable("text.limitedafk.players_footer"),false);
       return afkCount;
    }
    
-   public static int playtimeCmd(CommandContext<ServerCommandSource> context){
-      ServerCommandSource source = context.getSource();
-      if(!source.isExecutedByPlayer()){
-         source.sendError(Text.literal("Command must be executed by a player").formatted(Formatting.RED));
+   public static int playtimeCmd(CommandContext<CommandSourceStack> context){
+      CommandSourceStack source = context.getSource();
+      if(!source.isPlayer()){
+         source.sendFailure(Component.translatable("text.limitedafk.must_be_player").withStyle(ChatFormatting.RED));
       }
-      DecimalFormat df = new DecimalFormat( "#.00" );
       
-      ServerPlayerEntity player = source.getPlayer();
-      IPlayerProfileComponent profile = PLAYER_DATA.get(player);
-      source.sendFeedback(() -> Text.literal("")
-            .append(player.getDisplayName())
-            .append(Text.literal(" has played for [").formatted(Formatting.WHITE))
-            .append(Text.literal(timeToStr(profile.getTotalTime())).formatted(Formatting.GRAY))
-            .append(Text.literal("]").formatted(Formatting.WHITE)),false);
-      source.sendFeedback(() -> Text.literal("")
-            .append(player.getDisplayName())
-            .append(Text.literal(" has AFK'd a total of [").formatted(Formatting.RED))
-            .append(Text.literal(timeToStr(profile.getAfkTime())).formatted(Formatting.GRAY))
-            .append(Text.literal("]").formatted(Formatting.RED)),false);
-      source.sendFeedback(() -> Text.literal("")
-            .append(player.getDisplayName())
-            .append(Text.literal(" has been Active for a total of [").formatted(Formatting.GREEN))
-            .append(Text.literal(timeToStr(profile.getActiveTime())).formatted(Formatting.GRAY))
-            .append(Text.literal("]").formatted(Formatting.GREEN)),false);
-      source.sendFeedback(() -> Text.literal("")
-            .append(player.getDisplayName())
-            .append(Text.literal(" has an AFK percentage of ").formatted(Formatting.DARK_AQUA))
-            .append(Text.literal(df.format(100L*profile.getAfkTime()/(profile.getTotalTime()+1))).formatted(Formatting.AQUA))
-            .append(Text.literal("%").formatted(Formatting.AQUA)),false);
+      ServerPlayer player = source.getPlayer();
+      PlayerData profile = DataAccess.getPlayer(player.getUUID(),PlayerData.KEY);
+      source.sendSuccess(() -> Component.translatable("text.limitedafk.playtime_total",
+            player.getDisplayName(),
+            timeToStr(profile.getTotalTime()).withStyle(ChatFormatting.GRAY)).withStyle(ChatFormatting.WHITE),false);
+      source.sendSuccess(() -> Component.translatable("text.limitedafk.playtime_afk",
+            player.getDisplayName(),
+            timeToStr(profile.getAfkTime()).withStyle(ChatFormatting.GRAY)).withStyle(ChatFormatting.RED),false);
+      source.sendSuccess(() -> Component.translatable("text.limitedafk.playtime_active",
+            player.getDisplayName(),
+            timeToStr(profile.getActiveTime()).withStyle(ChatFormatting.GRAY)).withStyle(ChatFormatting.GREEN),false);
+      source.sendSuccess(() -> Component.translatable("text.limitedafk.playtime_percentage",
+            player.getDisplayName(),
+            Component.literal(profile.getFormattedPercentage()).withStyle(ChatFormatting.AQUA)).withStyle(ChatFormatting.DARK_AQUA),false);
       
       return 1;
    }
    
-   public static int playtimeAllCmd(CommandContext<ServerCommandSource> context){
-      ServerCommandSource source = context.getSource();
-      MinecraftServer server = source.getServer();
-      NameToIdCache baseCache = server.getApiServices().nameToIdCache();
-      List<ServerPlayerEntity> allPlayers = new ArrayList<>();
-      if(baseCache instanceof UserCache userCache){
-         List<UserCache.Entry> cacheEntries = userCache.load();
-         
-         for(UserCache.Entry cacheEntry : cacheEntries){
-            Optional<GameProfile> opt = server.getApiServices().profileResolver().getProfileById(cacheEntry.getPlayer().id());;
-            if(opt.isEmpty()) continue;
-            GameProfile reqProfile = opt.get();
-            ServerPlayerEntity reqPlayer = getRequestedPlayer(server, reqProfile);
-            allPlayers.add(reqPlayer);
-         }
-      }else{
-         log(2,"Was unable to pull player data");
-      }
-      
-      DecimalFormat df = new DecimalFormat("#.00");
+   public static int playtimeAllCmd(CommandContext<CommandSourceStack> context){
+      CommandSourceStack source = context.getSource();
+      Map<UUID,PlayerData> allPlayers = DataAccess.allPlayerDataFor(PlayerData.KEY);
       
       log(0,"An Operator has initiated a playtime dump:");
       StringBuilder masterString = new StringBuilder("===== Full Playtime List =====");
       
-      ArrayList<IPlayerProfileComponent> allPlaytime = new ArrayList<>();
-      
-      for(ServerPlayerEntity player : allPlayers){
-         IPlayerProfileComponent profile = PLAYER_DATA.get(player);
-         allPlaytime.add(profile);
-      }
+      ArrayList<PlayerData> allPlaytime = new ArrayList<>(allPlayers.values());
       
       Collections.sort(allPlaytime);
       
-      for(IPlayerProfileComponent profile : allPlaytime){
+      for(PlayerData profile : allPlaytime){
          if(profile == null){
             log(1,"An error occurred loading a null profile");
          }else{
-            String str = "\n" + profile.getPlayer().getNameForScoreboard() + " has played for a total of [" + timeToStr(profile.getTotalTime()) + "] - (" + timeToStr(profile.getActiveTime()) + " Active | " + timeToStr(profile.getAfkTime()) + " AFK) - <" + df.format(100L * profile.getAfkTime() / (profile.getTotalTime()+1)) + "%>";
+            String str = "\n" + profile.getUsername() +
+                  " has played for a total of [" +
+                  timeToStr(profile.getTotalTime()).getString() +
+                  "] - (" +
+                  timeToStr(profile.getActiveTime()).getString() +
+                  " Active | " +
+                  timeToStr(profile.getAfkTime()).getString() +
+                  " AFK) - <" +
+                  profile.getFormattedPercentage() +
+                  "%>";
             masterString.append(str);
          }
       }
       
-      source.sendFeedback(() -> Text.literal("Click to copy full dump").styled(s -> s.withClickEvent(new ClickEvent.CopyToClipboard(masterString.toString()))),false);
+      source.sendSuccess(() -> Component.translatable("text.limitedafk.click_to_copy").withStyle(s -> s.withClickEvent(new ClickEvent.CopyToClipboard(masterString.toString()))),false);
       log(0,masterString.toString());
       
       return allPlayers.size();
    }
    
-   public static int playtimePlayerCmd(CommandContext<ServerCommandSource> context, ServerPlayerEntity player){
-      ServerCommandSource source = context.getSource();
-      DecimalFormat df = new DecimalFormat( "#.00" );
+   public static int playtimePlayerCmd(CommandContext<CommandSourceStack> context, String name){
+      CommandSourceStack source = context.getSource();
+      ServerPlayer player = context.getSource().getServer().getPlayerList().getPlayer(name);
+      PlayerData profile;
+      if(player == null){
+         profile = DataAccess.allPlayerDataFor(PlayerData.KEY).values().stream().filter(data -> data.getUsername().toLowerCase(Locale.ROOT).equals(name.toLowerCase(Locale.ROOT))).findAny().orElse(null);
+         if(profile == null){
+            source.sendFailure(Component.translatable("text.limitedafk.no_player_found"));
+            return 0;
+         }
+      }else{
+         profile = DataAccess.getPlayer(player.getUUID(),PlayerData.KEY);
+      }
       
-      IPlayerProfileComponent profile = PLAYER_DATA.get(player);
-      source.sendFeedback(() -> Text.literal("")
-            .append(player.getDisplayName())
-            .append(Text.literal(" has played for [").formatted(Formatting.WHITE))
-            .append(Text.literal(timeToStr(profile.getTotalTime())).formatted(Formatting.GRAY))
-            .append(Text.literal("]").formatted(Formatting.WHITE)),false);
-      source.sendFeedback(() -> Text.literal("")
-            .append(player.getDisplayName())
-            .append(Text.literal(" has AFK'd a total of [").formatted(Formatting.RED))
-            .append(Text.literal(timeToStr(profile.getAfkTime())).formatted(Formatting.GRAY))
-            .append(Text.literal("]").formatted(Formatting.RED)),false);
-      source.sendFeedback(() -> Text.literal("")
-            .append(player.getDisplayName())
-            .append(Text.literal(" has been Active for a total of [").formatted(Formatting.GREEN))
-            .append(Text.literal(timeToStr(profile.getActiveTime())).formatted(Formatting.GRAY))
-            .append(Text.literal("]").formatted(Formatting.GREEN)),false);
-      source.sendFeedback(() -> Text.literal("")
-            .append(player.getDisplayName())
-            .append(Text.literal(" has an AFK percentage of ").formatted(Formatting.DARK_AQUA))
-            .append(Text.literal(df.format(100L*profile.getAfkTime()/(profile.getTotalTime()+1))).formatted(Formatting.AQUA))
-            .append(Text.literal("%").formatted(Formatting.AQUA)),false);
+      source.sendSuccess(() -> Component.translatable("text.limitedafk.playtime_total",
+            profile.getUsername(),
+            timeToStr(profile.getTotalTime()).withStyle(ChatFormatting.GRAY)).withStyle(ChatFormatting.WHITE),false);
+      source.sendSuccess(() -> Component.translatable("text.limitedafk.playtime_afk",
+            profile.getUsername(),
+            timeToStr(profile.getAfkTime()).withStyle(ChatFormatting.GRAY)).withStyle(ChatFormatting.RED),false);
+      source.sendSuccess(() -> Component.translatable("text.limitedafk.playtime_active",
+            profile.getUsername(),
+            timeToStr(profile.getActiveTime()).withStyle(ChatFormatting.GRAY)).withStyle(ChatFormatting.GREEN),false);
+      source.sendSuccess(() -> Component.translatable("text.limitedafk.playtime_percentage",
+            profile.getUsername(),
+            Component.literal(profile.getFormattedPercentage()).withStyle(ChatFormatting.AQUA)).withStyle(ChatFormatting.DARK_AQUA),false);
       
       return 1;
    }
    
-   public static int actionsPlayerCmd(CommandContext<ServerCommandSource> context, ServerPlayerEntity player){
-      ServerCommandSource source = context.getSource();
-      IPlayerProfileComponent profile = PLAYER_DATA.get(player);
+   public static int actionsPlayerCmd(CommandContext<CommandSourceStack> context, ServerPlayer player){
+      CommandSourceStack source = context.getSource();
+      PlayerData profile = DataAccess.getPlayer(player.getUUID(),PlayerData.KEY);
       long curTime = System.currentTimeMillis();
       
-      source.sendFeedback(() -> Text.literal("")
-            .append(Text.literal("Player Actions for: "))
-            .append(player.getDisplayName()),false);
+      source.sendSuccess(() -> Component.translatable("text.limitedafk.player_actions_header",
+            player.getDisplayName()),false);
       for(Map.Entry<String, Long> entry : profile.getLastActionTimes().entrySet()){
-         source.sendFeedback(() -> Text.literal(" - "+entry.getKey()+": "+timeToStr(curTime-entry.getValue())), false);
+         source.sendSuccess(() -> Component.translatable("text.limitedafk.player_action_entry",
+               Component.literal(entry.getKey()).withStyle(ChatFormatting.YELLOW),
+               timeToStr(curTime-entry.getValue()).withStyle(ChatFormatting.GRAY)), false);
       }
       
       return 1;
    }
    
-   public static String timeToStr(long millis){
+   public static MutableComponent timeToStr(long millis){
       long time = millis / 1000;
-      if(time <= 0) return "0 Seconds";
+      if(time <= 0) return Component.literal("0 ").append(Component.translatable("text.limitedafk.seconds"));
       long subtract = time;
+      long daysDif = subtract / 86400;
+      subtract -= daysDif * 86400;
       long hoursDif = subtract / 3600;
       subtract -= hoursDif * 3600;
       long minutesDif = subtract / 60;
       subtract -= minutesDif * 60;
       long secondsDiff = subtract;
       
-      String diff = "";
-      if(hoursDif > 0 ) diff += hoursDif+" Hours ";
-      if(minutesDif > 0 ) diff += minutesDif+" Minutes ";
-      if(secondsDiff > 0 ) diff += secondsDiff+" Seconds ";
-      diff = diff.substring(0,diff.length()-1);
-      
-      return diff;
+      MutableComponent text = Component.literal("");
+      boolean needSpace = false;
+      if(daysDif > 0){
+         text.append(Component.literal(daysDif+" "));
+         text.append(Component.translatable("text.limitedafk.days"));
+         needSpace = true;
+      }
+      if(hoursDif > 0){
+         if(needSpace) text.append(Component.literal(" "));
+         text.append(Component.literal(hoursDif+" "));
+         text.append(Component.translatable("text.limitedafk.hours"));
+         needSpace = true;
+      }
+      if(minutesDif > 0){
+         if(needSpace) text.append(Component.literal(" "));
+         text.append(Component.literal(minutesDif+" "));
+         text.append(Component.translatable("text.limitedafk.minutes"));
+         needSpace = true;
+      }
+      if(secondsDiff > 0){
+         if(needSpace) text.append(Component.literal(" "));
+         text.append(Component.literal(secondsDiff+" "));
+         text.append(Component.translatable("text.limitedafk.seconds"));
+      }
+      return text;
    }
    
-   public static int setAfkLevel(CommandContext<ServerCommandSource> context, ServerPlayerEntity player, AFKLevel level){
+   public static int setAfkLevel(CommandContext<CommandSourceStack> context, String name, AFKLevel level){
       if(level == null){
-         context.getSource().sendError(Text.literal("Invalid AFK Level"));
+         context.getSource().sendFailure(Component.translatable("text.limitedafk.invalid_afk_level"));
          return -1;
       }
-      PLAYER_DATA.get(player).setAfkLevel(level);
-      context.getSource().sendFeedback(() -> Text.literal(player.getNameForScoreboard()+"'s AFK Level is now "+PLAYER_DATA.get(player).getAfkLevel().asString()),false);
-      return 1;
-   }
-   
-   public static int getAfkLevel(CommandContext<ServerCommandSource> context, ServerPlayerEntity player){
-      context.getSource().sendFeedback(() -> Text.literal(player.getNameForScoreboard()+"'s AFK Level is "+PLAYER_DATA.get(player).getAfkLevel().asString()),false);
-      return 1;
-   }
-   
-   public static int resetAfkLevel(CommandContext<ServerCommandSource> context, ServerPlayerEntity player){
-      PLAYER_DATA.get(player).resetLevel();
-      context.getSource().sendFeedback(() -> Text.literal("Reset "+player.getNameForScoreboard()+"'s AFK Level"),false);
-      return 1;
-   }
-   
-   public static boolean addTickTimerCallback(TickTimerCallback callback){
-      return SERVER_TIMER_CALLBACKS.add(callback);
-   }
-   
-   public static ServerPlayerEntity getRequestedPlayer(MinecraftServer server, GameProfile requestedProfile){
-      ServerPlayerEntity requestedPlayer = server.getPlayerManager().getPlayer(requestedProfile.name());
-      
-      if (requestedPlayer == null) {
-         requestedPlayer = new ServerPlayerEntity(server, server.getOverworld(), requestedProfile, SyncedClientOptions.createDefault());
-         Optional<ReadView> readViewOpt = server
-               .getPlayerManager()
-               .loadPlayerData(new PlayerConfigEntry(requestedProfile))
-               .map(playerData -> NbtReadView.create(new ErrorReporter.Logging(LogUtils.getLogger()), server.getRegistryManager(), playerData));
-         readViewOpt.ifPresent(requestedPlayer::readData);
-         
-         if (readViewOpt.isPresent()) {
-            ReadView readView = readViewOpt.get();
-            Optional<String> dimension = readView.getOptionalString("Dimension");
-            
-            if (dimension.isPresent()) {
-               ServerWorld world = server.getWorld(RegistryKey.of(RegistryKeys.WORLD, Identifier.tryParse(dimension.get())));
-               if(world != null) ((EntityAccessor) requestedPlayer).callSetWorld(world);
-            }
+      ServerPlayer player = context.getSource().getServer().getPlayerList().getPlayer(name);
+      PlayerData profile;
+      if(player == null){
+         profile = DataAccess.allPlayerDataFor(PlayerData.KEY).values().stream().filter(data -> data.getUsername().toLowerCase(Locale.ROOT).equals(name.toLowerCase(Locale.ROOT))).findAny().orElse(null);
+         if(profile == null){
+            context.getSource().sendFailure(Component.translatable("text.limitedafk.no_player_found"));
+            return 0;
          }
+      }else{
+         profile = DataAccess.getPlayer(player.getUUID(),PlayerData.KEY);
       }
-      return requestedPlayer;
+      
+      profile.setAfkLevel(level);
+      context.getSource().sendSuccess(() -> Component.translatable("text.limitedafk.afk_level_set",
+            profile.getUsername(),
+            Component.literal(profile.getAfkLevel().getSerializedName()).withStyle(ChatFormatting.AQUA)),false);
+      return 1;
    }
    
+   public static int getAfkLevel(CommandContext<CommandSourceStack> context, String name){
+      ServerPlayer player = context.getSource().getServer().getPlayerList().getPlayer(name);
+      PlayerData profile;
+      if(player == null){
+         profile = DataAccess.allPlayerDataFor(PlayerData.KEY).values().stream().filter(data -> data.getUsername().toLowerCase(Locale.ROOT).equals(name.toLowerCase(Locale.ROOT))).findAny().orElse(null);
+         if(profile == null){
+            context.getSource().sendFailure(Component.translatable("text.limitedafk.no_player_found"));
+            return 0;
+         }
+      }else{
+         profile = DataAccess.getPlayer(player.getUUID(),PlayerData.KEY);
+      }
+      
+      context.getSource().sendSuccess(() -> Component.translatable("text.limitedafk.afk_level_get",
+            profile.getUsername(),
+            Component.literal(profile.getAfkLevel().getSerializedName()).withStyle(ChatFormatting.AQUA)),false);
+      return 1;
+   }
    
-   public enum AFKLevel implements StringIdentifiable {
+   public static int resetAfkLevel(CommandContext<CommandSourceStack> context, String name){
+      ServerPlayer player = context.getSource().getServer().getPlayerList().getPlayer(name);
+      PlayerData profile;
+      if(player == null){
+         profile = DataAccess.allPlayerDataFor(PlayerData.KEY).values().stream().filter(data -> data.getUsername().toLowerCase(Locale.ROOT).equals(name.toLowerCase(Locale.ROOT))).findAny().orElse(null);
+         if(profile == null){
+            context.getSource().sendFailure(Component.translatable("text.limitedafk.no_player_found"));
+            return 0;
+         }
+      }else{
+         profile = DataAccess.getPlayer(player.getUUID(),PlayerData.KEY);
+      }
+      
+      profile.resetLevel();
+      context.getSource().sendSuccess(() -> Component.translatable("text.limitedafk.afk_level_reset",profile.getUsername()),false);
+      return 1;
+   }
+   
+   public enum AFKLevel implements StringRepresentable {
       LOW("LOW"),
       MEDIUM("MEDIUM"),
       HIGH("HIGH");
@@ -324,7 +348,7 @@ public class LimitedAFK implements ModInitializer {
       }
       
       @Override
-      public String asString(){
+      public String getSerializedName(){
          return this.id;
       }
    }

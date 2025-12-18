@@ -11,7 +11,7 @@
     "repo": "https://github.com/borisshoes/LimitedAFK"
   },
   "license": "OSL-3.0",
-  "icon": "assets/LimitedAFK/icon.png",
+  "icon": "assets/limitedafk/icon.png",
   "environment": "*",
   "entrypoints": {
     "main": [
@@ -25,7 +25,7 @@
     "cardinal-components": ["limitedafk:profile"]
   },
   "mixins": [
-    "LimitedAFK.mixins.json"
+    "limitedafk.mixins.json"
   ],
   "accessWidener" : "limitedafk.accesswidener",
   "depends": {

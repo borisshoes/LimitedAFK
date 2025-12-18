@@ -1,5 +1,5 @@
 accessWidener	v1	named
 
 # UserCache Entry Access Widener
-accessible class net/minecraft/util/UserCache$Entry
-accessible method net/minecraft/util/UserCache load ()Ljava/util/List;
+accessible class net/minecraft/server/players/CachedUserNameToIdResolver$GameProfileInfo
+accessible method net/minecraft/server/players/CachedUserNameToIdResolver load ()Ljava/util/List;
