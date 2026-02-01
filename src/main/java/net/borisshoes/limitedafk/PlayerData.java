@@ -1,71 +1,34 @@
 package net.borisshoes.limitedafk;
 
-import com.mojang.serialization.Codec;
-import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.borisshoes.borislib.BorisLib;
 import net.borisshoes.borislib.datastorage.DataKey;
 import net.borisshoes.borislib.datastorage.DataRegistry;
+import net.borisshoes.borislib.datastorage.StorableData;
 import net.borisshoes.borislib.timers.GenericTimer;
-import net.borisshoes.borislib.utils.CodecUtils;
 import net.borisshoes.borislib.utils.TextUtils;
 import net.borisshoes.limitedafk.gui.CaptchaGui;
 import net.minecraft.ChatFormatting;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.game.ClientboundClearTitlesPacket;
 import net.minecraft.network.protocol.game.ClientboundSetTitleTextPacket;
 import net.minecraft.network.protocol.game.ClientboundSetTitlesAnimationPacket;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.phys.Vec2;
 import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.NonNull;
 
-import java.text.DecimalFormat;
 import java.util.*;
 
 import static net.borisshoes.limitedafk.LimitedAFK.CONFIG;
 import static net.borisshoes.limitedafk.LimitedAFK.MOD_ID;
 
-public class PlayerData implements Comparable<PlayerData>{
+public class PlayerData implements Comparable<PlayerData>, StorableData {
    
-   public static final Codec<PlayerData> CODEC = RecordCodecBuilder.create(instance -> instance.group(
-         CodecUtils.UUID_CODEC.fieldOf("playerID").forGetter(data -> data.playerID),
-         Codec.STRING.optionalFieldOf("username", "").forGetter(data -> data.username),
-         Codec.unboundedMap(Codec.STRING, Codec.LONG).fieldOf("lastActionTimes").forGetter(data -> data.lastActionTimes),
-         Vec3.CODEC.listOf().fieldOf("moves").forGetter(data -> new ArrayList<>(data.moves)),
-         Vec2.CODEC.listOf().fieldOf("looks").forGetter(data -> new ArrayList<>(data.looks)),
-         Codec.LONG.fieldOf("totalTime").forGetter(data -> data.totalTime),
-         Codec.LONG.fieldOf("activeTime").forGetter(data -> data.activeTime),
-         Codec.LONG.fieldOf("afkTime").forGetter(data -> data.afkTime),
-         Codec.LONG.fieldOf("lastUpdate").forGetter(data -> data.lastUpdate),
-         Codec.LONG.fieldOf("stateChangeTime").forGetter(data -> data.stateChangeTime),
-         Codec.LONG.fieldOf("lastCaptcha").forGetter(data -> data.lastCaptcha),
-         Codec.LONG.fieldOf("lastTitlePulse").forGetter(data -> data.lastTitlePulse),
-         Codec.BOOL.fieldOf("afk").forGetter(data -> data.afk),
-         Codec.STRING.optionalFieldOf("overrideLevel").forGetter(data -> data.overrideLevel != null ? Optional.of(data.overrideLevel.getSerializedName()) : Optional.empty()),
-         Codec.BOOL.fieldOf("levelOverridden").forGetter(data -> data.levelOverridden)
-   ).apply(instance, PlayerData::fromCodec));
-   
-   private static PlayerData fromCodec(UUID playerID, String username, Map<String, Long> lastActionTimes, List<Vec3> moves, List<Vec2> looks, long totalTime, long activeTime, long afkTime, long lastUpdate, long stateChangeTime, long lastCaptcha, long lastTitlePulse, boolean afk, Optional<String> overrideLevel, boolean levelOverridden) {
-      PlayerData data = new PlayerData(playerID);
-      data.setUsername(username);
-      data.lastActionTimes.putAll(lastActionTimes);
-      data.moves.addAll(moves);
-      data.looks.addAll(looks);
-      data.totalTime = totalTime;
-      data.activeTime = activeTime;
-      data.afkTime = afkTime;
-      data.lastUpdate = lastUpdate;
-      data.stateChangeTime = stateChangeTime;
-      data.lastCaptcha = lastCaptcha;
-      data.lastTitlePulse = lastTitlePulse;
-      data.afk = afk;
-      data.levelOverridden = levelOverridden;
-      data.overrideLevel = overrideLevel.map(LimitedAFK.AFKLevel::valueOf).orElse((LimitedAFK.AFKLevel) CONFIG.getValue(LimitedAFK.DEFAULT_AFK_DETECTION_LEVEL.getName()));
-      return data;
-   }
-   
-   public static final DataKey<PlayerData> KEY = DataRegistry.register(DataKey.ofPlayer(Identifier.fromNamespaceAndPath(MOD_ID, "playerdata"), CODEC,PlayerData::new));
+   public static final DataKey<PlayerData> KEY = DataRegistry.register(DataKey.ofPlayer(Identifier.fromNamespaceAndPath(MOD_ID, "playerdata"), PlayerData::new));
    
    private final UUID playerID;
    private String username = "";
@@ -107,11 +70,11 @@ public class PlayerData implements Comparable<PlayerData>{
    }
    
    public double getPlaytimePercentage(){
-      return (double)getAfkTime() / (double)(getTotalTime()+1);
+      return (double) getAfkTime() / (double) (getTotalTime() + 1);
    }
    
    public String getFormattedPercentage(){
-      return TextUtils.readableDouble(100*getPlaytimePercentage());
+      return TextUtils.readableDouble(100 * getPlaytimePercentage());
    }
    
    public HashMap<String, Long> getLastActionTimes(){
@@ -254,7 +217,7 @@ public class PlayerData implements Comparable<PlayerData>{
       if(afk){
          afkTime += millis;
          
-if(CONFIG.getBoolean(LimitedAFK.ENABLED) && 100 * afkTime / totalTime >= CONFIG.getInt(LimitedAFK.ALLOWED_AFK_PERCENTAGE)){
+         if(CONFIG.getBoolean(LimitedAFK.ENABLED) && 100 * afkTime / totalTime >= CONFIG.getInt(LimitedAFK.ALLOWED_AFK_PERCENTAGE)){
             if(player instanceof ServerPlayer serverPlayer){
                serverPlayer.connection.disconnect(Component.translatable("text.limitedafk.too_much_afk"));
             }
@@ -337,6 +300,73 @@ if(CONFIG.getBoolean(LimitedAFK.ENABLED) && 100 * afkTime / totalTime >= CONFIG.
    
    @Override
    public int compareTo(@NonNull PlayerData o){
-      return Long.compare(o.getTotalTime(),totalTime);
+      return Long.compare(o.getTotalTime(), totalTime);
+   }
+   
+   @Override
+   public void read(ValueInput view){
+      this.username = view.getStringOr("username", "");
+      
+      CompoundTag lastActionsTag = view.read("lastActionTimes", CompoundTag.CODEC).orElse(new CompoundTag());
+      for(String key : lastActionsTag.keySet()){
+         this.lastActionTimes.put(key, lastActionsTag.getLongOr(key, 0L));
+      }
+      
+      view.listOrEmpty("moves", Vec3.CODEC).forEach(this.moves::add);
+      view.listOrEmpty("looks", Vec2.CODEC).forEach(this.looks::add);
+      this.totalTime = view.getLongOr("totalTime", 0L);
+      this.activeTime = view.getLongOr("activeTime", 0L);
+      this.afkTime = view.getLongOr("afkTime", 0L);
+      this.lastUpdate = view.getLongOr("lastUpdate", 0L);
+      this.stateChangeTime = view.getLongOr("stateChangeTime", 0L);
+      this.lastCaptcha = view.getLongOr("lastCaptcha", 0L);
+      this.lastTitlePulse = view.getLongOr("lastTitlePulse", 0L);
+      this.afk = view.getBooleanOr("afk", false);
+      this.levelOverridden = view.getBooleanOr("levelOverridden", false);
+      
+      try{
+         this.overrideLevel = LimitedAFK.AFKLevel.valueOf(view.getStringOr("overrideLevel", ""));
+      }catch(Exception ignored){
+         this.overrideLevel = (LimitedAFK.AFKLevel) CONFIG.getValue(LimitedAFK.DEFAULT_AFK_DETECTION_LEVEL.getName());
+      }
+   }
+   
+   @Override
+   public void writeNbt(CompoundTag tag){
+      tag.putString("username", username);
+      CompoundTag actionTimesTag = new CompoundTag();
+      for(Map.Entry<String, Long> entry : lastActionTimes.entrySet()){
+         actionTimesTag.putLong(entry.getKey(), entry.getValue());
+      }
+      tag.put("lastActionTimes", actionTimesTag);
+      ListTag movesTag = new ListTag();
+      for(Vec3 move : moves){
+         CompoundTag moveTag = new CompoundTag();
+         moveTag.putDouble("x", move.x);
+         moveTag.putDouble("y", move.y);
+         moveTag.putDouble("z", move.z);
+         movesTag.add(moveTag);
+      }
+      tag.put("moves", movesTag);
+      ListTag looksTag = new ListTag();
+      for(Vec2 look : looks){
+         CompoundTag lookTag = new CompoundTag();
+         lookTag.putFloat("x", look.x);
+         lookTag.putFloat("y", look.y);
+         looksTag.add(lookTag);
+      }
+      tag.put("looks", looksTag);
+      tag.putLong("totalTime", totalTime);
+      tag.putLong("activeTime", activeTime);
+      tag.putLong("afkTime", afkTime);
+      tag.putLong("lastUpdate", lastUpdate);
+      tag.putLong("stateChangeTime", stateChangeTime);
+      tag.putLong("lastCaptcha", lastCaptcha);
+      tag.putLong("lastTitlePulse", lastTitlePulse);
+      tag.putBoolean("afk", afk);
+      tag.putBoolean("levelOverridden", levelOverridden);
+      if(overrideLevel != null){
+         tag.putString("overrideLevel", overrideLevel.getSerializedName());
+      }
    }
 }
