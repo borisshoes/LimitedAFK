@@ -14,6 +14,8 @@
   "command.limitedafk.default_afk_detection_level.getter_setter": "Default AFK detection level: %s",
   "command.limitedafk.captcha_timer.comment": "Interval between when someone suspected of being AFK is given a captcha",
   "command.limitedafk.captcha_timer.getter_setter": "The captcha timer is %s seconds",
+  "command.limitedafk.log_command_usage.comment": "Whether to log successful command usage to the server console.",
+  "command.limitedafk.log_command_usage.getter_setter": "Log command usage: %s",
   "text.limitedafk.days": "Days",
   "text.limitedafk.hours": "Hours",
   "text.limitedafk.minutes": "Minutes",

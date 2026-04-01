@@ -51,7 +51,7 @@ public class LimitedAFK implements ModInitializer {
    public static final String MOD_ID = "limitedafk";
    public static ConfigManager CONFIG;
    
-   public static final Registry<IConfigSetting<?>> CONFIG_SETTINGS = new MappedRegistry<>(ResourceKey.createRegistryKey(Identifier.fromNamespaceAndPath(MOD_ID,"config_settings")), Lifecycle.stable());
+   public static final Registry<IConfigSetting<?>> CONFIG_SETTINGS = new MappedRegistry<>(ResourceKey.createRegistryKey(Identifier.fromNamespaceAndPath(MOD_ID, "config_settings")), Lifecycle.stable());
    
    public static final IConfigSetting<?> ENABLED = registerConfigSetting(new ConfigSetting<>(
          new BooleanConfigValue("enabled", true)));
@@ -74,8 +74,11 @@ public class LimitedAFK implements ModInitializer {
    public static final IConfigSetting<?> CAPTCHA_TIMER = registerConfigSetting(new ConfigSetting<>(
          new IntConfigValue("captchaTimer", 600, new IntConfigValue.IntLimits(120))));
    
+   public static final IConfigSetting<?> LOG_COMMAND_USAGE = registerConfigSetting(new ConfigSetting<>(
+         new BooleanConfigValue("logCommandUsage", false)));
+   
    private static IConfigSetting<?> registerConfigSetting(IConfigSetting<?> setting){
-      Registry.register(CONFIG_SETTINGS, Identifier.fromNamespaceAndPath(MOD_ID,setting.getId()),setting);
+      Registry.register(CONFIG_SETTINGS, Identifier.fromNamespaceAndPath(MOD_ID, setting.getId()), setting);
       return setting;
    }
    
@@ -89,13 +92,14 @@ public class LimitedAFK implements ModInitializer {
       UseBlockCallback.EVENT.register(InteractionsCallback::useBlock);
       AttackEntityCallback.EVENT.register(InteractionsCallback::attackEntity);
       
-      CONFIG = new ConfigManager(MOD_ID,"Ancestral Archetypes",CONFIG_NAME,CONFIG_SETTINGS);
+      CONFIG = new ConfigManager(MOD_ID, "Ancestral Archetypes", CONFIG_NAME, CONFIG_SETTINGS);
    }
    
    /**
     * Uses built in logger to log a message
+    *
     * @param level 0 - Info | 1 - Warn | 2 - Error | 3 - Fatal | Else - Debug
-    * @param msg  The {@code String} to be printed.
+    * @param msg   The {@code String} to be printed.
     */
    public static void log(int level, String msg){
       switch(level){
@@ -107,6 +111,14 @@ public class LimitedAFK implements ModInitializer {
       }
    }
    
+   private static void logCommandSuccess(CommandContext<CommandSourceStack> context){
+      if(CONFIG.getBoolean(LOG_COMMAND_USAGE)){
+         String executor = context.getSource().getTextName();
+         String command = context.getInput();
+         log(0, "[Command] " + executor + " executed: /" + command);
+      }
+   }
+   
    public static int listAfkCmd(CommandContext<CommandSourceStack> context){
       CommandSourceStack source = context.getSource();
       MinecraftServer server = source.getServer();
@@ -115,9 +127,9 @@ public class LimitedAFK implements ModInitializer {
       
       int afkCount = 0;
       
-      source.sendSuccess(() -> Component.translatable("text.limitedafk.players_header"),false);
+      source.sendSuccess(() -> Component.translatable("text.limitedafk.players_header"), false);
       for(ServerPlayer player : players){
-         PlayerData profile = DataAccess.getPlayer(player.getUUID(),PlayerData.KEY);
+         PlayerData profile = DataAccess.getPlayer(player.getUUID(), PlayerData.KEY);
          boolean afk = profile.isAfk();
          if(afk){
             afkCount++;
@@ -125,9 +137,10 @@ public class LimitedAFK implements ModInitializer {
          source.sendSuccess(() -> Component.translatable("text.limitedafk.player_status",
                player.getDisplayName(),
                Component.translatable(afk ? "text.limitedafk.status_afk" : "text.limitedafk.status_active").withStyle(afk ? ChatFormatting.RED : ChatFormatting.GREEN),
-               timeToStr(System.currentTimeMillis() - profile.getStateChangeTime()).withStyle(ChatFormatting.GRAY)),false);
+               timeToStr(System.currentTimeMillis() - profile.getStateChangeTime()).withStyle(ChatFormatting.GRAY)), false);
       }
-      source.sendSuccess(() -> Component.translatable("text.limitedafk.players_footer"),false);
+      source.sendSuccess(() -> Component.translatable("text.limitedafk.players_footer"), false);
+      logCommandSuccess(context);
       return afkCount;
    }
    
@@ -138,28 +151,29 @@ public class LimitedAFK implements ModInitializer {
       }
       
       ServerPlayer player = source.getPlayer();
-      PlayerData profile = DataAccess.getPlayer(player.getUUID(),PlayerData.KEY);
+      PlayerData profile = DataAccess.getPlayer(player.getUUID(), PlayerData.KEY);
       source.sendSuccess(() -> Component.translatable("text.limitedafk.playtime_total",
             player.getDisplayName(),
-            timeToStr(profile.getTotalTime()).withStyle(ChatFormatting.GRAY)).withStyle(ChatFormatting.WHITE),false);
+            timeToStr(profile.getTotalTime()).withStyle(ChatFormatting.GRAY)).withStyle(ChatFormatting.WHITE), false);
       source.sendSuccess(() -> Component.translatable("text.limitedafk.playtime_afk",
             player.getDisplayName(),
-            timeToStr(profile.getAfkTime()).withStyle(ChatFormatting.GRAY)).withStyle(ChatFormatting.RED),false);
+            timeToStr(profile.getAfkTime()).withStyle(ChatFormatting.GRAY)).withStyle(ChatFormatting.RED), false);
       source.sendSuccess(() -> Component.translatable("text.limitedafk.playtime_active",
             player.getDisplayName(),
-            timeToStr(profile.getActiveTime()).withStyle(ChatFormatting.GRAY)).withStyle(ChatFormatting.GREEN),false);
+            timeToStr(profile.getActiveTime()).withStyle(ChatFormatting.GRAY)).withStyle(ChatFormatting.GREEN), false);
       source.sendSuccess(() -> Component.translatable("text.limitedafk.playtime_percentage",
             player.getDisplayName(),
-            Component.literal(profile.getFormattedPercentage()).withStyle(ChatFormatting.AQUA)).withStyle(ChatFormatting.DARK_AQUA),false);
+            Component.literal(profile.getFormattedPercentage()).withStyle(ChatFormatting.AQUA)).withStyle(ChatFormatting.DARK_AQUA), false);
       
+      logCommandSuccess(context);
       return 1;
    }
    
    public static int playtimeAllCmd(CommandContext<CommandSourceStack> context){
       CommandSourceStack source = context.getSource();
-      Map<UUID,PlayerData> allPlayers = DataAccess.allPlayerDataFor(PlayerData.KEY);
+      Map<UUID, PlayerData> allPlayers = DataAccess.allPlayerDataFor(PlayerData.KEY);
       
-      log(0,"An Operator has initiated a playtime dump:");
+      log(0, "An Operator has initiated a playtime dump:");
       StringBuilder masterString = new StringBuilder("===== Full Playtime List =====");
       
       ArrayList<PlayerData> allPlaytime = new ArrayList<>(allPlayers.values());
@@ -168,7 +182,7 @@ public class LimitedAFK implements ModInitializer {
       
       for(PlayerData profile : allPlaytime){
          if(profile == null){
-            log(1,"An error occurred loading a null profile");
+            log(1, "An error occurred loading a null profile");
          }else{
             String str = "\n" + profile.getUsername() +
                   " has played for a total of [" +
@@ -184,9 +198,10 @@ public class LimitedAFK implements ModInitializer {
          }
       }
       
-      source.sendSuccess(() -> Component.translatable("text.limitedafk.click_to_copy").withStyle(s -> s.withClickEvent(new ClickEvent.CopyToClipboard(masterString.toString()))),false);
-      log(0,masterString.toString());
+      source.sendSuccess(() -> Component.translatable("text.limitedafk.click_to_copy").withStyle(s -> s.withClickEvent(new ClickEvent.CopyToClipboard(masterString.toString()))), false);
+      log(0, masterString.toString());
       
+      logCommandSuccess(context);
       return allPlayers.size();
    }
    
@@ -201,38 +216,40 @@ public class LimitedAFK implements ModInitializer {
             return 0;
          }
       }else{
-         profile = DataAccess.getPlayer(player.getUUID(),PlayerData.KEY);
+         profile = DataAccess.getPlayer(player.getUUID(), PlayerData.KEY);
       }
       
       source.sendSuccess(() -> Component.translatable("text.limitedafk.playtime_total",
             profile.getUsername(),
-            timeToStr(profile.getTotalTime()).withStyle(ChatFormatting.GRAY)).withStyle(ChatFormatting.WHITE),false);
+            timeToStr(profile.getTotalTime()).withStyle(ChatFormatting.GRAY)).withStyle(ChatFormatting.WHITE), false);
       source.sendSuccess(() -> Component.translatable("text.limitedafk.playtime_afk",
             profile.getUsername(),
-            timeToStr(profile.getAfkTime()).withStyle(ChatFormatting.GRAY)).withStyle(ChatFormatting.RED),false);
+            timeToStr(profile.getAfkTime()).withStyle(ChatFormatting.GRAY)).withStyle(ChatFormatting.RED), false);
       source.sendSuccess(() -> Component.translatable("text.limitedafk.playtime_active",
             profile.getUsername(),
-            timeToStr(profile.getActiveTime()).withStyle(ChatFormatting.GRAY)).withStyle(ChatFormatting.GREEN),false);
+            timeToStr(profile.getActiveTime()).withStyle(ChatFormatting.GRAY)).withStyle(ChatFormatting.GREEN), false);
       source.sendSuccess(() -> Component.translatable("text.limitedafk.playtime_percentage",
             profile.getUsername(),
-            Component.literal(profile.getFormattedPercentage()).withStyle(ChatFormatting.AQUA)).withStyle(ChatFormatting.DARK_AQUA),false);
+            Component.literal(profile.getFormattedPercentage()).withStyle(ChatFormatting.AQUA)).withStyle(ChatFormatting.DARK_AQUA), false);
       
+      logCommandSuccess(context);
       return 1;
    }
    
    public static int actionsPlayerCmd(CommandContext<CommandSourceStack> context, ServerPlayer player){
       CommandSourceStack source = context.getSource();
-      PlayerData profile = DataAccess.getPlayer(player.getUUID(),PlayerData.KEY);
+      PlayerData profile = DataAccess.getPlayer(player.getUUID(), PlayerData.KEY);
       long curTime = System.currentTimeMillis();
       
       source.sendSuccess(() -> Component.translatable("text.limitedafk.player_actions_header",
-            player.getDisplayName()),false);
+            player.getDisplayName()), false);
       for(Map.Entry<String, Long> entry : profile.getLastActionTimes().entrySet()){
          source.sendSuccess(() -> Component.translatable("text.limitedafk.player_action_entry",
                Component.literal(entry.getKey()).withStyle(ChatFormatting.YELLOW),
-               timeToStr(curTime-entry.getValue()).withStyle(ChatFormatting.GRAY)), false);
+               timeToStr(curTime - entry.getValue()).withStyle(ChatFormatting.GRAY)), false);
       }
       
+      logCommandSuccess(context);
       return 1;
    }
    
@@ -251,25 +268,25 @@ public class LimitedAFK implements ModInitializer {
       MutableComponent text = Component.literal("");
       boolean needSpace = false;
       if(daysDif > 0){
-         text.append(Component.literal(daysDif+" "));
+         text.append(Component.literal(daysDif + " "));
          text.append(Component.translatable("text.limitedafk.days"));
          needSpace = true;
       }
       if(hoursDif > 0){
          if(needSpace) text.append(Component.literal(" "));
-         text.append(Component.literal(hoursDif+" "));
+         text.append(Component.literal(hoursDif + " "));
          text.append(Component.translatable("text.limitedafk.hours"));
          needSpace = true;
       }
       if(minutesDif > 0){
          if(needSpace) text.append(Component.literal(" "));
-         text.append(Component.literal(minutesDif+" "));
+         text.append(Component.literal(minutesDif + " "));
          text.append(Component.translatable("text.limitedafk.minutes"));
          needSpace = true;
       }
       if(secondsDiff > 0){
          if(needSpace) text.append(Component.literal(" "));
-         text.append(Component.literal(secondsDiff+" "));
+         text.append(Component.literal(secondsDiff + " "));
          text.append(Component.translatable("text.limitedafk.seconds"));
       }
       return text;
@@ -289,13 +306,14 @@ public class LimitedAFK implements ModInitializer {
             return 0;
          }
       }else{
-         profile = DataAccess.getPlayer(player.getUUID(),PlayerData.KEY);
+         profile = DataAccess.getPlayer(player.getUUID(), PlayerData.KEY);
       }
       
       profile.setAfkLevel(level);
       context.getSource().sendSuccess(() -> Component.translatable("text.limitedafk.afk_level_set",
             profile.getUsername(),
-            Component.literal(profile.getAfkLevel().getSerializedName()).withStyle(ChatFormatting.AQUA)),false);
+            Component.literal(profile.getAfkLevel().getSerializedName()).withStyle(ChatFormatting.AQUA)), false);
+      logCommandSuccess(context);
       return 1;
    }
    
@@ -309,12 +327,13 @@ public class LimitedAFK implements ModInitializer {
             return 0;
          }
       }else{
-         profile = DataAccess.getPlayer(player.getUUID(),PlayerData.KEY);
+         profile = DataAccess.getPlayer(player.getUUID(), PlayerData.KEY);
       }
       
       context.getSource().sendSuccess(() -> Component.translatable("text.limitedafk.afk_level_get",
             profile.getUsername(),
-            Component.literal(profile.getAfkLevel().getSerializedName()).withStyle(ChatFormatting.AQUA)),false);
+            Component.literal(profile.getAfkLevel().getSerializedName()).withStyle(ChatFormatting.AQUA)), false);
+      logCommandSuccess(context);
       return 1;
    }
    
@@ -328,11 +347,12 @@ public class LimitedAFK implements ModInitializer {
             return 0;
          }
       }else{
-         profile = DataAccess.getPlayer(player.getUUID(),PlayerData.KEY);
+         profile = DataAccess.getPlayer(player.getUUID(), PlayerData.KEY);
       }
       
       profile.resetLevel();
-      context.getSource().sendSuccess(() -> Component.translatable("text.limitedafk.afk_level_reset",profile.getUsername()),false);
+      context.getSource().sendSuccess(() -> Component.translatable("text.limitedafk.afk_level_reset", profile.getUsername()), false);
+      logCommandSuccess(context);
       return 1;
    }
    

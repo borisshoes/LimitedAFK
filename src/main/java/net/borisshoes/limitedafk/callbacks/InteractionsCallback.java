@@ -15,26 +15,30 @@ import org.jetbrains.annotations.Nullable;
 
 public class InteractionsCallback {
    public static InteractionResult useItem(Player player, Level world, InteractionHand hand){
-      if(!(player instanceof ServerPlayer serverPlayer) || !(world instanceof ServerLevel)) return InteractionResult.PASS;
-      DataAccess.getPlayer(player.getUUID(),PlayerData.KEY).updateActionTime("playerInteract",System.currentTimeMillis());
+      if(!(player instanceof ServerPlayer serverPlayer) || !(world instanceof ServerLevel))
+         return InteractionResult.PASS;
+      DataAccess.getPlayer(player.getUUID(), PlayerData.KEY).updateActionTime("playerInteract", System.currentTimeMillis());
       return InteractionResult.PASS;
    }
    
    public static InteractionResult useEntity(Player player, Level world, InteractionHand hand, Entity entity, @Nullable EntityHitResult entityHitResult){
-      if(!(player instanceof ServerPlayer serverPlayer) || !(world instanceof ServerLevel)) return InteractionResult.PASS;
-      DataAccess.getPlayer(player.getUUID(),PlayerData.KEY).updateActionTime("playerInteract",System.currentTimeMillis());
+      if(!(player instanceof ServerPlayer serverPlayer) || !(world instanceof ServerLevel))
+         return InteractionResult.PASS;
+      DataAccess.getPlayer(player.getUUID(), PlayerData.KEY).updateActionTime("playerInteract", System.currentTimeMillis());
       return InteractionResult.PASS;
    }
    
    public static InteractionResult useBlock(Player player, Level world, InteractionHand hand, BlockHitResult blockHitResult){
-      if(!(player instanceof ServerPlayer serverPlayer) || !(world instanceof ServerLevel)) return InteractionResult.PASS;
-      DataAccess.getPlayer(player.getUUID(),PlayerData.KEY).updateActionTime("playerInteract",System.currentTimeMillis());
+      if(!(player instanceof ServerPlayer serverPlayer) || !(world instanceof ServerLevel))
+         return InteractionResult.PASS;
+      DataAccess.getPlayer(player.getUUID(), PlayerData.KEY).updateActionTime("playerInteract", System.currentTimeMillis());
       return InteractionResult.PASS;
    }
    
    public static InteractionResult attackEntity(Player player, Level world, InteractionHand hand, Entity entity, @Nullable EntityHitResult entityHitResult){
-      if(!(player instanceof ServerPlayer serverPlayer) || !(world instanceof ServerLevel)) return InteractionResult.PASS;
-      DataAccess.getPlayer(player.getUUID(),PlayerData.KEY).updateActionTime("playerInteract",System.currentTimeMillis());
+      if(!(player instanceof ServerPlayer serverPlayer) || !(world instanceof ServerLevel))
+         return InteractionResult.PASS;
+      DataAccess.getPlayer(player.getUUID(), PlayerData.KEY).updateActionTime("playerInteract", System.currentTimeMillis());
       return InteractionResult.PASS;
    }
 }

@@ -21,21 +21,21 @@ public class ServerGamePacketListenerImplMixin {
    private void limitedafk_onPlayerInput(ServerboundPlayerInputPacket packet, CallbackInfo ci){
       ServerGamePacketListenerImpl handler = (ServerGamePacketListenerImpl) (Object) this;
       ServerPlayer player = handler.player;
-      DataAccess.getPlayer(player.getUUID(), PlayerData.KEY).updateActionTime("playerInput",System.currentTimeMillis());
+      DataAccess.getPlayer(player.getUUID(), PlayerData.KEY).updateActionTime("playerInput", System.currentTimeMillis());
    }
    
    @Inject(method = "handlePlayerAction", at = @At("HEAD"))
    private void limitedafk_onPlayerAction(ServerboundPlayerActionPacket packet, CallbackInfo ci){
       ServerGamePacketListenerImpl handler = (ServerGamePacketListenerImpl) (Object) this;
       ServerPlayer player = handler.player;
-      DataAccess.getPlayer(player.getUUID(),PlayerData.KEY).updateActionTime("playerAction",System.currentTimeMillis());
+      DataAccess.getPlayer(player.getUUID(), PlayerData.KEY).updateActionTime("playerAction", System.currentTimeMillis());
    }
    
    @Inject(method = "handleSetCarriedItem", at = @At("TAIL"))
    private void limitedafk_onChangeHeld(ServerboundSetCarriedItemPacket packet, CallbackInfo ci){
       ServerGamePacketListenerImpl handler = (ServerGamePacketListenerImpl) (Object) this;
       ServerPlayer player = handler.player;
-      DataAccess.getPlayer(player.getUUID(),PlayerData.KEY).updateActionTime("selectSlot",System.currentTimeMillis());
+      DataAccess.getPlayer(player.getUUID(), PlayerData.KEY).updateActionTime("selectSlot", System.currentTimeMillis());
    }
    
 }

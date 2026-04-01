@@ -16,7 +16,7 @@ public class PlayerListMixin {
    
    // Called when a player sends a chat message
    @Inject(at = @At("HEAD"), method = "broadcastChatMessage(Lnet/minecraft/network/chat/PlayerChatMessage;Lnet/minecraft/server/level/ServerPlayer;Lnet/minecraft/network/chat/ChatType$Bound;)V")
-   private void broadcast(PlayerChatMessage message, ServerPlayer sender, ChatType.Bound params, CallbackInfo ci) {
-      DataAccess.getPlayer(sender.getUUID(), PlayerData.KEY).updateActionTime("chatMessage",System.currentTimeMillis());
+   private void broadcast(PlayerChatMessage message, ServerPlayer sender, ChatType.Bound params, CallbackInfo ci){
+      DataAccess.getPlayer(sender.getUUID(), PlayerData.KEY).updateActionTime("chatMessage", System.currentTimeMillis());
    }
 }

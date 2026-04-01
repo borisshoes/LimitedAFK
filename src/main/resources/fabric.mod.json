@@ -16,13 +16,7 @@
   "entrypoints": {
     "main": [
       "net.borisshoes.limitedafk.LimitedAFK"
-    ],
-    "cardinal-components-entity": [
-      "net.borisshoes.limitedafk.cca.PlayerComponentInitializer"
     ]
-  },
-  "custom": {
-    "cardinal-components": ["limitedafk:profile"]
   },
   "mixins": [
     "limitedafk.mixins.json"
@@ -30,7 +24,8 @@
   "accessWidener" : "limitedafk.accesswidener",
   "depends": {
     "fabricloader": ">=${loader_version}",
-    "fabric": "*",
-    "minecraft": ">=${minecraft_version}"
+    "fabric-api": "*",
+    "minecraft": ">=${minecraft_version}",
+    "borislib": ">=${borislib_mod_version}"
   }
 }

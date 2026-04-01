@@ -1,4 +1,4 @@
-accessWidener	v1	named
+accessWidener	v2	official
 
 # UserCache Entry Access Widener
 accessible class net/minecraft/server/players/CachedUserNameToIdResolver$GameProfileInfo

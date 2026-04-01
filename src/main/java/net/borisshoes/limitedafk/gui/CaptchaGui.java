@@ -10,7 +10,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.contents.TranslatableContents;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.inventory.ClickType;
+import net.minecraft.world.inventory.ContainerInput;
 import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -35,7 +35,7 @@ public class CaptchaGui extends SimpleGui {
       super(MenuType.GENERIC_9x6, player, false);
       
       mode = Math.random() > 0.8;
-      numPuzzles = 2 + (int)(Math.random()*6);
+      numPuzzles = 2 + (int) (Math.random() * 6);
       
       setTitle(Component.translatable("text.limitedafk.captcha_title"));
    }
@@ -51,11 +51,10 @@ public class CaptchaGui extends SimpleGui {
    }
    
    @Override
-   public boolean onAnyClick(int index, eu.pb4.sgui.api.ClickType type, ClickType action){
+   public boolean onAnyClick(int index, eu.pb4.sgui.api.ClickType type, ContainerInput action){
       if(index < getSize() && index >= 9){
-         ItemStack clicked = getSlot(index).getItemStack();
-         boolean success = mode ? ((TranslatableContents)clicked.getHoverName().getContents()).getKey().equals(goalItem.getDescriptionId()) : clicked.getItem().getDescriptionId().equals(goalItem.getDescriptionId());
-         
+         ItemStack clicked = getGuiElement(index).getItemStack();
+         boolean success = mode ? ((TranslatableContents) clicked.getHoverName().getContents()).getKey().equals(goalItem.getDescriptionId()) : clicked.getItem().getDescriptionId().equals(goalItem.getDescriptionId());
          if(success){
             if(curAttempt < numPuzzles){
                curAttempt++;
@@ -75,24 +74,24 @@ public class CaptchaGui extends SimpleGui {
       for(int i = 0; i < 9; i++){
          GuiElementBuilder pane = new GuiElementBuilder(Items.BLACK_STAINED_GLASS_PANE);
          pane.setName(Component.translatable("text.limitedafk.captcha_title").withStyle(ChatFormatting.RED, ChatFormatting.BOLD));
-         setSlot(i,pane);
+         setSlot(i, pane);
       }
       
       goalItem = getRandomItem();
       
       GuiElementBuilder goalElem = new GuiElementBuilder(goalItem);
       goalElem.setName(Component.translatable(mode ? "text.limitedafk.captcha_goal_name" : "text.limitedafk.captcha_goal_look").withStyle(ChatFormatting.RED, ChatFormatting.BOLD));
-      setSlot(4,goalElem);
+      setSlot(4, goalElem);
       
       for(int i = 9; i < getSize(); i++){
          Item appearanceItem = getRandomItem();
          Item nameItem = getRandomItem();
          GuiElementBuilder itemElem = new GuiElementBuilder(appearanceItem);
          itemElem.setName(Component.translatable(nameItem.getDescriptionId()).withStyle(ChatFormatting.GREEN));
-         setSlot(i,itemElem);
+         setSlot(i, itemElem);
       }
       
-      int successSlot = (int)(Math.random()*(getSize()-9)) + 9;
+      int successSlot = (int) (Math.random() * (getSize() - 9)) + 9;
       GuiElementBuilder successElem;
       if(mode){
          successElem = new GuiElementBuilder(getRandomItem());
@@ -101,12 +100,12 @@ public class CaptchaGui extends SimpleGui {
          successElem = new GuiElementBuilder(goalItem);
          successElem.setName(Component.translatable(getRandomItem().getDescriptionId()).withStyle(ChatFormatting.GREEN));
       }
-      setSlot(successSlot,successElem);
+      setSlot(successSlot, successElem);
    }
    
    @Override
-   public void onClose(){
-      PlayerData profile = DataAccess.getPlayer(player.getUUID(),PlayerData.KEY);
+   public void onRemoved(){
+      PlayerData profile = DataAccess.getPlayer(player.getUUID(), PlayerData.KEY);
       if(captchaFail){
          int timer = (CONFIG.getInt(LimitedAFK.CAPTCHA_TIMER) / 60);
          if(captchaTimeout){
@@ -120,11 +119,10 @@ public class CaptchaGui extends SimpleGui {
       }else{
          profile.captchaSuccess();
       }
-      super.onClose();
    }
    
    private Item getRandomItem(){
-      Item item = BuiltInRegistries.ITEM.byId(((int)(Math.random()* BuiltInRegistries.ITEM.size())));
+      Item item = BuiltInRegistries.ITEM.byId(((int) (Math.random() * BuiltInRegistries.ITEM.size())));
       return item == Items.AIR ? getRandomItem() : item;
    }
 }

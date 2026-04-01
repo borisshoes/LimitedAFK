@@ -21,9 +21,34 @@ Configuration can be done through the properties file generated when loaded on a
 * ```/limitedafk afkTimer <60+>``` Sets how many seconds of inactivity it takes until a player is marked as AFK
 * ```/limitedafk defaultAfkDetectionLevel <LOW/MEDIUM/HIGH>``` Sets how aggressive the AFK detection is by default (LOW and MEDIUM require various levels of activity, and HIGH requires a captcha)
 * ```/limitedafk captchaTimer <120+>``` Sets the interval between when someone suspected of being AFK is given a captcha (in seconds)
+* ```/limitedafk logCommandUsage <true/false>``` Sets whether successful command executions are logged to the server console
 * ```/afklevel get <player>``` Gets the modified (or default) AFK detection level required for the specified player
 * ```/afklevel set <player> <LOW/MEDIUM/HIGH>``` Sets the modified AFK detection level required for the specified player
 * ```/afklevel reset <player>``` Resets the modified AFK detection level required for the specified player to the default value
+
+### Permission Nodes
+LimitedAFK uses the [Fabric Permissions API](https://github.com/lucko/fabric-permissions-api) for command permissions. Each node has a fallback vanilla permission level for servers without a permissions mod.
+
+#### General
+| Node | Default | Description |
+|------|---------|-------------|
+| `limitedafk.afklist` | `ALL` | Use `/afklist` to see who is AFK |
+| `limitedafk.playtime` | `ALL` | Use `/playtime` to check your own playtime |
+| `limitedafk.playtime.others` | `GAMEMASTERS` | Use `/playtime <player>` to check another player's playtime |
+| `limitedafk.playtime.all` | `GAMEMASTERS` | Use `/playtime all` to dump playtime for all players |
+| `limitedafk.playtime.actions` | `GAMEMASTERS` | Use `/playtime actions <player>` to check a player's action timestamps |
+| `limitedafk.afklevel.get` | `GAMEMASTERS` | Use `/afklevel get <player>` to read a player's AFK detection level |
+| `limitedafk.afklevel.set` | `GAMEMASTERS` | Use `/afklevel set <player> <level>` to change a player's AFK detection level |
+| `limitedafk.afklevel.reset` | `GAMEMASTERS` | Use `/afklevel reset <player>` to reset a player's AFK detection level to default |
+
+#### Config
+Config commands are generated automatically by BorisLib per config value.
+
+| Node | Default | Description |
+|------|---------|-------------|
+| `limitedafk.config` | `GAMEMASTERS` | List all config values via `/limitedafk` |
+| `limitedafk.config.<name>.get` | `GAMEMASTERS` | Read a specific config value |
+| `limitedafk.config.<name>.set` | `GAMEMASTERS` | Change a specific config value |
 
 ### LICENSE NOTICE
 By using this project in any form, you hereby give your "express assent" for the terms of the license of this project, and acknowledge that I, BorisShoes, have fulfilled my obligation under the license to "make a reasonable effort under the circumstances to obtain the express assent of recipients to the terms of this License.
