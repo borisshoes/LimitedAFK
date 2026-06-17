@@ -72,7 +72,7 @@ public class CaptchaGui extends SimpleGui {
    
    public void build(){
       for(int i = 0; i < 9; i++){
-         GuiElementBuilder pane = new GuiElementBuilder(Items.BLACK_STAINED_GLASS_PANE);
+         GuiElementBuilder pane = new GuiElementBuilder(Items.STAINED_GLASS_PANE.black());
          pane.setName(Component.translatable("text.limitedafk.captcha_title").withStyle(ChatFormatting.RED, ChatFormatting.BOLD));
          setSlot(i, pane);
       }
